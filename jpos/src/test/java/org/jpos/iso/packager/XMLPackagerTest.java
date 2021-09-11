@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,8 @@
 
 package org.jpos.iso.packager;
 
+import static org.apache.commons.lang3.JavaVersion.JAVA_14;
+import static org.apache.commons.lang3.SystemUtils.isJavaVersionAtMost;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -117,7 +119,11 @@ public class XMLPackagerTest {
             xMLPackager.endElement("testXMLPackagerNs", null, "testXMLPackagerQname");
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"String.equals(Object)\" because \"name\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -125,7 +131,11 @@ public class XMLPackagerTest {
     public void testGetFieldDescription() throws Throwable {
         ISOComponent m = new ISOMsg(100);
         String result = xMLPackager.getFieldDescription(m, 100);
-        assertEquals("<notavailable/>", result, "result");
+        // old version
+        // assertEquals("<notavailable/>", result, "result");
+
+        // new version, inspired in XML2003Packager
+        assertEquals("Data element "+100, result, "result");
     }
 
     @Test
@@ -271,7 +281,11 @@ public class XMLPackagerTest {
             xMLPackager.startElement("testXMLPackagerNs", null, "testXMLPackagerQName", atts);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"String.equals(Object)\" because \"name\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -281,7 +295,11 @@ public class XMLPackagerTest {
             xMLPackager.startElement("testXMLPackagerNs", "testXMLPackagerName", "testXMLPackagerQName", null);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"org.xml.sax.Attributes.getValue(String)\" because \"atts\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 }

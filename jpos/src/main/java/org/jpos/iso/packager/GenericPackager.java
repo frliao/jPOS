@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,7 +37,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.util.Map;
@@ -51,12 +50,12 @@ import java.util.TreeMap;
  * GenericPackager uses an XML config file to describe the layout of an ISOMessage
  * The general format is as follows
  * &lt;isopackager&gt;
- *     &lt;isofield 
+ *     &lt;isofield
  *         id="[field id]"
  *         name="[field name]"
  *         length="[max field length]"
  *         class="[org.jpos.iso.IF_*]"
- *         pad="true|false"&gt;  
+ *         pad="true|false"&gt;
  *     &lt;/isofield&gt;
  *     ...
  * &lt;/isopackager&gt;
@@ -68,8 +67,8 @@ import java.util.TreeMap;
  *     length="[field length]"
  *     class="[org.jpos.iso.IF_*]"
  *     packager="[org.jpos.iso.packager.*]"&gt;
- *      
- *     &lt;isofield 
+ *
+ *     &lt;isofield
  *         id="[subfield id]"
  *         name="[subfield name]"
  *         length="[max subfield length]"
@@ -90,11 +89,11 @@ import java.util.TreeMap;
  */
 
 @SuppressWarnings("unchecked")
-public class GenericPackager 
-    extends ISOBasePackager implements Configurable
+public class GenericPackager
+    extends ISOBasePackager implements Configurable, GenericPackagerParams
 {
    /* Values copied from ISOBasePackager
-      These can be changes using attributes on the isopackager node */ 
+      These can be changes using attributes on the isopackager node */
     private int maxValidField=128;
     private boolean emitBitmap=true;
     private int bitmapField=1;
@@ -106,8 +105,8 @@ public class GenericPackager
         super();
     }
 
-    /** 
-     * Create a GenericPackager with the field descriptions 
+    /**
+     * Create a GenericPackager with the field descriptions
      * from an XML File
      * @param filename The XML field description file
      */
@@ -117,8 +116,8 @@ public class GenericPackager
         readFile(filename);
     }
 
-    /** 
-     * Create a GenericPackager with the field descriptions 
+    /**
+     * Create a GenericPackager with the field descriptions
      * from an XML InputStream
      * @param input The XML field description InputStream
      */
@@ -133,12 +132,13 @@ public class GenericPackager
      * <ul>
      *  <li>packager-config
      *  <li>packager-logger
+     *  <li>packager-log-fieldname
      *  <li>packager-realm
      * </ul>
      *
      * @param cfg Configuration
      */
-    public void setConfiguration (Configuration cfg) 
+    public void setConfiguration (Configuration cfg)
         throws ConfigurationException
     {
         filename = cfg.get("packager-config", null);
@@ -149,8 +149,12 @@ public class GenericPackager
         {
             String loggerName = cfg.get("packager-logger");
             if (loggerName != null)
-                setLogger(Logger.getLogger (loggerName), 
+                setLogger(Logger.getLogger (loggerName),
                            cfg.get ("packager-realm"));
+
+            // inherited protected logFieldName
+            logFieldName= cfg.getBoolean("packager-log-fieldname", logFieldName);
+
             readFile(filename);
         } catch (ISOException e)
         {
@@ -196,7 +200,7 @@ public class GenericPackager
             } else {
                 createXMLReader().parse(filename);
             }
-        } 
+        }
         catch (Exception e) {
             throw new ISOException("Error reading " + filename, e);
         }
@@ -215,7 +219,7 @@ public class GenericPackager
     {
         try {
             createXMLReader().parse(new InputSource(input));
-        } 
+        }
         catch (Exception e) {
             throw new ISOException(e);
         }
@@ -230,7 +234,7 @@ public class GenericPackager
                     if (o instanceof LogSource) {
                         ((LogSource)o).setLogger (logger, realm + "-fld-" + i);
                     }
-                } 
+                }
             }
         }
     }
@@ -240,8 +244,8 @@ public class GenericPackager
             reader = XMLReaderFactory.createXMLReader();
         } catch (SAXException e) {
             reader = XMLReaderFactory.createXMLReader (
-                System.getProperty( 
-                    "org.xml.sax.driver", 
+                System.getProperty(
+                    "org.xml.sax.driver",
                     "org.apache.crimson.parser.XMLReaderImpl"
                 )
             );
@@ -265,8 +269,8 @@ public class GenericPackager
         return sb.toString();
     }
 
-    protected void setGenericPackagerParams (Attributes atts)
-    {
+    @Override
+    public void setGenericPackagerParams (Attributes atts) {
         String maxField  = atts.getValue("maxValidField");
         String emitBmap  = atts.getValue("emitBitmap");
         String bmapfield = atts.getValue("bitmapField");
@@ -275,7 +279,7 @@ public class GenericPackager
         String headerLenStr = atts.getValue("headerLength");
 
         if (maxField != null)
-            maxValidField = Integer.parseInt(maxField); 
+            maxValidField = Integer.parseInt(maxField);
 
         if (emitBmap != null)
             emitBitmap = Boolean.valueOf(emitBmap);
@@ -309,7 +313,7 @@ public class GenericPackager
          * We first check whether the DTD points to a well defined URI,
          * and resolve to our internal DTDs.<p>
          *
-         * If the systemId points to a file, then we attempt to read the 
+         * If the systemId points to a file, then we attempt to read the
          * DTD from the filesystem, in case they've been modified by the user.
          * Otherwise, we fallback to the built-in DTDs inside jPOS.<p>
          *
@@ -427,10 +431,12 @@ public class GenericPackager
                     fieldStack.push(new Integer(id));
 
                     ISOFieldPackager f;
-                    f = (ISOFieldPackager) Class.forName(type).newInstance();   
+                    f = (ISOFieldPackager) Class.forName(type).newInstance();
                     f.setDescription(name);
                     f.setLength(Integer.parseInt(size));
                     f.setPad(Boolean.parseBoolean(pad));
+                    if (f instanceof GenericPackagerParams)
+                        ((GenericPackagerParams)f).setGenericPackagerParams (atts);
 
                     // Modified for using TaggedFieldPackager
                     if( f instanceof TaggedFieldPackager){
@@ -439,11 +445,8 @@ public class GenericPackager
                     fieldStack.push(f);
 
                     ISOBasePackager p = (ISOBasePackager) instantiate(packager, params);
-                    if (p instanceof GenericPackager)
-                    {
-                        GenericPackager gp = (GenericPackager) p;
-                        gp.setGenericPackagerParams (atts);
-                    }
+                    if (p instanceof GenericPackagerParams)
+                        ((GenericPackagerParams)p).setGenericPackagerParams (atts);
                     fieldStack.push(p);
 
                     fieldStack.push(new TreeMap());
@@ -521,7 +524,7 @@ public class GenericPackager
                 msgPackager.setLogger (getLogger(), getRealm() + "-fld-" + fno);
 
                 // Create the ISOMsgField packager with the retrieved msg and field Packagers
-                ISOMsgFieldPackager mfp = 
+                ISOMsgFieldPackager mfp =
                     new ISOMsgFieldPackager(fieldPackager, msgPackager);
 
                 // Add the newly created ISOMsgField packager to the

@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,17 +28,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.when;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.EOFException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
+import static org.apache.commons.lang3.JavaVersion.JAVA_13;
+import static org.apache.commons.lang3.JavaVersion.JAVA_14;
+import static org.apache.commons.lang3.SystemUtils.isJavaVersionAtMost;
+
+import java.io.*;
 import java.net.MalformedURLException;
 import java.nio.charset.Charset;
 import java.util.LinkedHashMap;
 
 import org.jdom2.Element;
+import org.jdom2.JDOMException;
 import org.jpos.iso.ISOException;
 import org.jpos.iso.ISOUtil;
 import org.jpos.space.SpaceFactory;
@@ -105,13 +105,28 @@ public class FSDMsgTest {
     }
 
     @Test
+    void testCopyWithDefault() throws Throwable {
+        FSDMsg original = new FSDMsg("testFSDMsgBasePath");
+        FSDMsg copy = new FSDMsg("testFSDMsgBasePath");
+        original.set("testfield", "avalue");
+        copy.copy("testfield", original, "default");
+        copy.copy("notset", original, "default");
+        assertEquals("avalue", copy.get("testfield"));
+        assertEquals("default", copy.get("notset"));
+    }
+
+    @Test
     public void testCopyThrowsNullPointerException() throws Throwable {
         FSDMsg fSDMsg = new FSDMsg("testFSDMsgBasePath", "testFSDMsgBaseSchema");
         try {
             fSDMsg.copy("testFSDMsgFieldName", null);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"org.jpos.util.FSDMsg.get(String)\" because \"msg\" is null", ex.getMessage(), "ex.getMessage()");
+            }
             assertEquals(0, fSDMsg.fields.size(), "fSDMsg.fields.size()");
         }
     }
@@ -157,7 +172,11 @@ public class FSDMsgTest {
             fSDMsg.dump(null, "testFSDMsgIndent");
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"java.io.PrintStream.println(String)\" because \"p\" is null", ex.getMessage(), "ex.getMessage()");
+            }
             assertEquals(0, fSDMsg.fields.size(), "fSDMsg.fields.size()");
         }
     }
@@ -172,7 +191,11 @@ public class FSDMsgTest {
             fSDMsg.dump(p, "testFSDMsgIndent");
             fail("Expected StringIndexOutOfBoundsException to be thrown");
         } catch (StringIndexOutOfBoundsException ex) {
-            assertEquals("String index out of range: -2", ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_13)) {
+                assertEquals("String index out of range: -2", ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("begin 2, end 0, length 0", ex.getMessage(), "ex.getMessage()");
+            }
             assertEquals(0, fSDMsg.fields.size(), "fSDMsg.fields.size()");
         }
     }
@@ -353,7 +376,11 @@ public class FSDMsgTest {
             fSDMsg.getHexHeader();
             fail("Expected StringIndexOutOfBoundsException to be thrown");
         } catch (StringIndexOutOfBoundsException ex) {
-            assertEquals("String index out of range: -2", ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_13)) {
+                assertEquals("String index out of range: -2", ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("begin 2, end 0, length 0", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -450,7 +477,11 @@ public class FSDMsgTest {
             fSDMsg.get("testString", null, 100, "testFSDMsgDefValue", null);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"String.toUpperCase()\" because \"type\" is null", ex.getMessage(), "ex.getMessage()");
+            }
             assertEquals(1, fSDMsg.fields.size(), "fSDMsg.fields.size()");
         }
     }
@@ -462,7 +493,11 @@ public class FSDMsgTest {
             fSDMsg.get("testFSDMsgId", null, 100, "testFSDMsgDefValue", null);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"String.toUpperCase()\" because \"type\" is null", ex.getMessage(), "ex.getMessage()");
+            }
             assertEquals(0, fSDMsg.fields.size(), "fSDMsg.fields.size()");
         }
     }
@@ -713,7 +748,7 @@ public class FSDMsgTest {
             fSDMsg.pack();
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            assertEquals("basePath can not be null", ex.getMessage(), "ex.getMessage()");
             assertEquals(0, fSDMsg.fields.size(), "fSDMsg.fields.size()");
             assertEquals("testFSDMsgBaseSchema", fSDMsg.baseSchema, "fSDMsg.baseSchema");
         }
@@ -727,7 +762,11 @@ public class FSDMsgTest {
             fSDMsg.pack(null, sb);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"org.jdom2.Element.getChildren(String)\" because \"schema\" is null", ex.getMessage(), "ex.getMessage()");
+            }
             assertEquals(0, fSDMsg.fields.size(), "fSDMsg.fields.size()");
             assertEquals("", sb.toString(), "sb.toString()");
         }
@@ -790,7 +829,11 @@ public class FSDMsgTest {
             fSDMsg.readField(null, "testFSDMsgFieldName", 100, "2C", null);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"java.io.InputStreamReader.read(char[])\" because \"r\" is null", ex.getMessage(), "ex.getMessage()");
+            }
             assertEquals(0, fSDMsg.fields.size(), "fSDMsg.fields.size()");
         }
     }
@@ -945,7 +988,11 @@ public class FSDMsgTest {
             fSDMsg.toXML();
             fail("Expected StringIndexOutOfBoundsException to be thrown");
         } catch (StringIndexOutOfBoundsException ex) {
-            assertEquals("String index out of range: -2", ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_13)) {
+                assertEquals("String index out of range: -2", ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("begin 2, end 0, length 0", ex.getMessage(), "ex.getMessage()");
+            }
             assertEquals(0, fSDMsg.fields.size(), "fSDMsg.fields.size()");
         }
     }
@@ -1001,7 +1048,7 @@ public class FSDMsgTest {
             fSDMsg.unpack(b);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            assertEquals("basePath can not be null", ex.getMessage(), "ex.getMessage()");
             assertEquals(0, fSDMsg.fields.size(), "fSDMsg.fields.size()");
             assertEquals("testFSDMsgBaseSchema", fSDMsg.baseSchema, "fSDMsg.baseSchema");
             assertEquals(1, b.length, "b.length");
@@ -1017,7 +1064,11 @@ public class FSDMsgTest {
             fSDMsg.unpack(r, null);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"org.jdom2.Element.getChildren(String)\" because \"schema\" is null", ex.getMessage(), "ex.getMessage()");
+            }
             assertEquals(0, fSDMsg.fields.size(), "fSDMsg.fields.size()");
             assertEquals(0, is.available(), "(ByteArrayInputStream) is.available()");
         }
@@ -1032,7 +1083,7 @@ public class FSDMsgTest {
             fSDMsg.unpack(is);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            assertEquals("basePath can not be null", ex.getMessage(), "ex.getMessage()");
             assertEquals(0, fSDMsg.fields.size(), "fSDMsg.fields.size()");
             assertEquals("testFSDMsgBaseSchema", fSDMsg.baseSchema, "fSDMsg.baseSchema");
             assertEquals(3, is.available(), "(ByteArrayInputStream) is.available()");
@@ -1177,5 +1228,23 @@ public class FSDMsgTest {
         b = fSDMsg.get("name").getBytes(charset);
         assertArrayEquals(expected, b, "FSDMsg.unpack(b) don't properly handle character encodings");
 
+    }
+
+    @Test
+    public void testLLVAR() throws JDOMException, IOException, ISOException {
+        Element schema = createSchema();
+        appendField(schema, "header", "A", null, 3);
+        appendField(schema, "llfield", "LLA", null, 99);
+        appendField(schema, "lllfield", "LLLA", null, 999);
+        FSDMsg msg = new FSDMsg(SCHEMA_PREFIX);
+        msg.set("header", "ISO");
+        msg.set("llfield", "ABCDE");
+        msg.set("lllfield", "123456789A");
+        String packed = msg.pack();
+        assertEquals("ISO05ABCDE010123456789A", packed);
+
+        FSDMsg msg1 = new FSDMsg(SCHEMA_PREFIX);
+        msg1.unpack(packed.getBytes());
+        assertEquals(msg, msg1);
     }
 }

@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -739,19 +739,19 @@ public class BaseSMAdapter<T>
         cmdParameters.add(new SimpleMsg("parameter", "cvk-b", cvkB == null ? "" : cvkB));
         cmdParameters.add(new SimpleMsg("parameter", "Exp date", expDate));
         cmdParameters.add(new SimpleMsg("parameter", "Service code", serviceCode));
-      LogEvent evt = new LogEvent(this, "s-m-operation");
-      evt.addMessage(new SimpleMsg("command", "Calculate CVV/CVC", cmdParameters));
-      String result = null;
-      try {
-        result = calculateCVVImpl(accountNo, cvkA, cvkB, expDate, serviceCode);
-        evt.addMessage(new SimpleMsg("result", "Calculated CVV/CVC", result));
-      } catch (Exception e) {
-        evt.addMessage(e);
-        throw e instanceof SMException ? (SMException) e : new SMException(e);
-      } finally {
-        Logger.log(evt);
-      }
-      return result;
+        LogEvent evt = new LogEvent(this, "s-m-operation");
+        evt.addMessage(new SimpleMsg("command", "Calculate CVV/CVC", cmdParameters));
+        String result = null;
+        try {
+            result = calculateCVVImpl(accountNo, cvkA, cvkB, expDate, serviceCode);
+            evt.addMessage(new SimpleMsg("result", "Calculated CVV/CVC", result));
+        } catch (Exception e) {
+            evt.addMessage(e);
+            throw e instanceof SMException ? (SMException) e : new SMException(e);
+        } finally {
+            Logger.log(evt);
+        }
+        return result;
     }
 
     @Override

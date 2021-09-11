@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -114,8 +114,8 @@ public class GenericValidatingPackager extends GenericPackager implements ISOVal
             throw new ISOException(e);
         }
     }
-
-    protected void setGenericPackagerParams ( Attributes atts ) {
+    @Override
+    public void setGenericPackagerParams ( Attributes atts ) {
         String maxField  = atts.getValue( "maxValidField" );
         String emitBmap  = atts.getValue( "emitBitmap" );
         String bmapfield = atts.getValue( "bitmapField" );

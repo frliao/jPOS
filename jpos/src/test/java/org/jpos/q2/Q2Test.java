@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,8 @@
 
 package org.jpos.q2;
 
+import static org.apache.commons.lang3.JavaVersion.JAVA_14;
+import static org.apache.commons.lang3.SystemUtils.isJavaVersionAtMost;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -35,6 +37,7 @@ import javax.management.ObjectName;
 
 import org.jdom2.Document;
 import org.jdom2.Element;
+import org.jpos.core.Environment;
 import org.jpos.q2.qbean.SystemMonitor;
 import org.jpos.util.Log;
 import org.junit.jupiter.api.*;
@@ -42,16 +45,16 @@ import org.junit.jupiter.api.*;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class Q2Test {
-    String[] m_args = new String[0];
-    Q2 m_q2;
+    static String[] m_args = new String[0];
+    static Q2 m_q2;
 
     @BeforeAll
-    public void setUp() {
+    public static void setUp() {
         m_q2 = new Q2(m_args);
     }
 
     @AfterAll
-    public void tearDown() throws Exception {
+    public static void tearDown() throws Exception {
         m_q2.shutdown(true);
     }
 
@@ -75,7 +78,11 @@ public class Q2Test {
             q2.accept(null);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"java.io.File.canRead()\" because \"f\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         } finally {
             q2.stop();
         }
@@ -121,7 +128,11 @@ public class Q2Test {
             q2.decrypt(null);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"org.jdom2.Document.getRootElement()\" because \"doc\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
         q2.stop();
     }
@@ -154,6 +165,15 @@ public class Q2Test {
         Q2 q2 = new Q2(args);
         File result = q2.getDeployDir();
         assertEquals("deploy", result.getName(), "result.getName()");
+        q2.stop();
+    }
+
+    @Test
+    public void testGetEnvDir() throws Throwable {
+        String[] args = { "-Ed", "blah/foo/bar" };
+        Q2 q2 = new Q2(args);
+        Environment env = Environment.getEnvironment();
+        assertEquals("blah/foo/bar", env.getEnvDir(), "env.getEnvDir()");
         q2.stop();
     }
 

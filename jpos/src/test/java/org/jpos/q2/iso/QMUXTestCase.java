@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 
 package org.jpos.q2.iso;
 
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -34,30 +35,40 @@ import org.jpos.space.Space;
 import org.jpos.space.SpaceFactory;
 import org.jpos.util.NameRegistrar;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 @SuppressWarnings("unchecked")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class QMUXTestCase implements ISOResponseListener {
-    Q2 q2;
-    Space sp;
-    MUX mux;
+    static Q2 q2;
+    static Space sp;
+    static MUX mux;
     boolean expiredCalled;
     ISOMsg responseMsg;
-    Object receivedHandback;
+    static Object receivedHandback;
 
     @BeforeAll
-    public void setUp() throws Exception {
+    public static void setUp(@TempDir Path deployDir) throws IOException {
         sp = SpaceFactory.getSpace();
-        q2 = new Q2("build/resources/test/org/jpos/q2/iso");
+        Files.walk(Paths.get("build/resources/test/org/jpos/q2/iso")).forEach( s -> {
+            if (Files.isRegularFile(s)) {
+                try {
+                    Files.copy(s, deployDir.resolve(s.getFileName()), REPLACE_EXISTING);
+                } catch (IOException e) {
+                    fail();
+                }
+            }
+        });
+        q2 = new Q2(deployDir.toString());
         q2.start();
-        Thread.sleep(2000L);
-        try {
-            mux = NameRegistrar.get("mux.mux");
-        } catch (NameRegistrar.NotFoundException e) {
-            fail("MUX not found");
-        }
+        mux = NameRegistrar.get("mux.mux", 2000L);
+        assertNotNull(mux);
         receivedHandback = null;
     }
 
@@ -96,7 +107,7 @@ public class QMUXTestCase implements ISOResponseListener {
     }
 
     @AfterAll
-    public void tearDown() throws Exception {
+    public static void tearDown() throws Exception {
         Thread.sleep(2000L); // let the thing run
         q2.shutdown(true);
         Thread.sleep(2000L);

@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,9 +22,9 @@ import org.jpos.iso.*;
 import org.jpos.util.LogEvent;
 import org.jpos.util.Logger;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.io.ByteArrayOutputStream;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 /**
@@ -55,13 +55,11 @@ public class EuroSubFieldPackager extends ISOBasePackager
     @Override
     public byte[] pack (ISOComponent c) throws ISOException {
         LogEvent evt = new LogEvent (this, "pack");
-        try {
-            int len =0;
+        try (ByteArrayOutputStream bout = new ByteArrayOutputStream(100)) {
             Map tab = c.getChildren();
-            List<byte[]> l = new ArrayList();
 
-            for (Map.Entry ent: (Set<Map.Entry>)tab.entrySet()){
-                Integer i = (Integer)ent.getKey();
+            for (Entry ent : (Set<Entry>) tab.entrySet()) {
+                Integer i = (Integer) ent.getKey();
                 if (i < 0)
                     continue;
                 if (fld[i] == null)
@@ -70,8 +68,7 @@ public class EuroSubFieldPackager extends ISOBasePackager
                     try {
                         ISOComponent f = (ISOComponent) ent.getValue();
                         byte[] b = fld[i].pack(f);
-                        len += b.length;
-                        l.add (b);
+                        bout.write(b);
                     } catch (Exception e) {
                         evt.addMessage ("error packing subfield "+i);
                         evt.addMessage (c);
@@ -79,12 +76,8 @@ public class EuroSubFieldPackager extends ISOBasePackager
                         throw e;
                     }
             }
-            int k=0;
-            byte[] d = new byte[len];
-            for (byte[] b :l) {
-                System.arraycopy(b, 0, d, k, b.length);
-                k += b.length;
-            }
+
+            byte[] d = bout.toByteArray();
             if (logger != null)  // save a few CPU cycle if no logger available
                 evt.addMessage (ISOUtil.hexString (d));
             return d;
@@ -95,34 +88,49 @@ public class EuroSubFieldPackager extends ISOBasePackager
         }
     }
 
+
+    /**
+     * This packager treats field 0 as a field that may or may not be present before the  TLV subelements.
+     *
+     * Certain types of messages for some 8583 specs that extend this class' behavior (e.g., the Mastercard implementation
+     * in class {@link MasterCardEBCDICSubFieldPackager}) may not have field 0 present (the TCC in Mastercard's nomenclature).
+     * So, if the corresponding isofield packager for field 0 doesn't fill the {@link ISOComponent}'s value,
+     * we don't store anything as subfield 0 of m.
+     */
     @Override
     public int unpack (ISOComponent m, byte[] b) throws ISOException
     {
         LogEvent evt = new LogEvent (this, "unpack");
         int consumed = 0;
-        ISOComponent c;
+        ISOComponent c = null;
 
         // Unpack the fields
         while (consumed < b.length) {
-            //Determine current tag
-            int i = consumed==0&&fld[0]!=null?0:tagPrefixer.decodeLength(b, consumed);
+            //If this is first iteration and there is a packager for SE 0 then i=0, i.e. use field packager for SE 0
+            //Else determine current tag
+            int i = c == null && fld[0] != null ? 0 : tagPrefixer.decodeLength(b, consumed);
 
             if (i >= fld.length || fld[i] == null)
                 throw new ISOException("Unsupported sub-field " + i + " unpacking field " + m.getKey());
 
             c = fld[i].createComponent(i);
             consumed += fld[i].unpack (c, b, consumed);
-            if (logger != null) 
+            if (i != 0 || c.getValue() != null)
             {
-                evt.addMessage ("<unpack fld=\"" + i 
-                    +"\" packager=\""
-                    +fld[i].getClass().getName()+ "\">");
-                    evt.addMessage ("  <value>" 
-                    +c.getValue().toString()
-                    + "</value>");
-                evt.addMessage ("</unpack>");
+                if (logger != null)
+                {
+                    evt.addMessage ("<unpack fld=\"" + i
+                        +"\" packager=\""
+                        +fld[i].getClass().getName()+ "\">");
+                        evt.addMessage ("  <value>"
+                        +c.getValue().toString()
+                        + "</value>");
+                    evt.addMessage ("</unpack>");
+                }
+                m.set(c);
             }
-            m.set(c);
+            // else:
+            // If it was field 0 (TCC) && nothing was stored in the component, we discard this component
         }
         Logger.log (evt);
         return consumed;

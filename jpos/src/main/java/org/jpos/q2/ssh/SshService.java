@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -36,6 +36,8 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Collections;
 import java.util.Set;
 
+import static java.nio.file.attribute.PosixFilePermission.*;
+
 public class SshService extends QBeanSupport implements SshCLIContextMBean
 {
     SshServer sshd = null;
@@ -52,7 +54,7 @@ public class SshService extends QBeanSupport implements SshCLIContextMBean
 
         sshd = SshServer.setUpDefaultServer();
         sshd.setPort(port);
-        sshd.setKeyPairProvider(new SimpleGeneratorHostKeyProvider(new File(hostKeys)));
+        sshd.setKeyPairProvider(new SimpleGeneratorHostKeyProvider(new File(hostKeys).toPath()));
 
         CliShellFactory csf = new CliShellFactory(getServer(), prefixes);
         sshd.setShellFactory(csf);
@@ -101,7 +103,8 @@ public class SshService extends QBeanSupport implements SshCLIContextMBean
           Files.getFileAttributeView(file, PosixFileAttributeView.class)
           .readAttributes();
         Set<PosixFilePermission> perms =  attrs.permissions();
-        if (perms.size() != 1 || !perms.contains(PosixFilePermission.OWNER_READ))
+        if (perms.contains(GROUP_WRITE) || perms.contains(OTHERS_WRITE) ||
+            (perms.contains(OWNER_WRITE) && !Files.isWritable(file)))
             throw new IllegalArgumentException(
               String.format ("Invalid permissions '%s' for file '%s'", PosixFilePermissions.toString(perms), s)
             );

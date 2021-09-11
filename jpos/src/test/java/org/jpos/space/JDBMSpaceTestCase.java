@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,16 +26,29 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.jpos.iso.ISOUtil;
 import org.jpos.util.Profiler;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 
 @SuppressWarnings("unchecked")
 public class JDBMSpaceTestCase {
     public static final int COUNT = 100;
     JDBMSpace<String,Object> sp;
     @BeforeEach
-    public void setUp () {
-        sp = (JDBMSpace<String,Object>) JDBMSpace.getSpace ("build/resources/test/jdbm-space-test");
+    public void setUp (TestInfo testInfo, @TempDir Path filename) {
+        sp = (JDBMSpace<String,Object>) JDBMSpace.getSpace (testInfo.getDisplayName(), filename.toString());
+        sp.run();
+    }
+    @AfterEach
+    public void tearDown () {
+        sp.close();
     }
     @Test
     public void testSimpleOut() throws Exception {
@@ -155,6 +168,7 @@ public class JDBMSpaceTestCase {
         assertNull (sp.rdp ("PUSH"));
     }
     @Test
+    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
     public void testOutExpire() {
         sp.out ("OUT", "ONE", 1000L);
         sp.out ("OUT", "TWO", 2000L);
@@ -170,6 +184,7 @@ public class JDBMSpaceTestCase {
         assertNull (sp.rdp ("OUT"));
     }
     @Test
+    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
     public void testPushExpire() {
         sp.push ("PUSH", "FOUR", 4000L);
         sp.push ("PUSH", "THREE", 3000L);
@@ -223,12 +238,12 @@ public class JDBMSpaceTestCase {
                 sp.out ("KA", Boolean.TRUE);
             }
         }.start();
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         assertTrue (
             sp.existAny(new String[]{"KA", "KB"}, 2000L),
             "existAnyWithTimeout ([KA,KB], delay)"
         );
-        long elapsed = System.currentTimeMillis() - now;
+        long elapsed = Duration.between(now, Instant.now()).toMillis();
         assertTrue (elapsed > 900L, "delay was > 1000");
         assertNotNull (sp.inp("KA"), "Entry should not be null");
     }

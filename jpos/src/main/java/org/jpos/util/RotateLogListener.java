@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -40,7 +40,7 @@ import java.util.TimerTask;
  * @since jPOS 1.2
  */
 public class RotateLogListener extends SimpleLogListener 
-    implements Configurable, Destroyable
+    implements AutoCloseable, Configurable, Destroyable
 {
     FileOutputStream f;
     String logName = null;

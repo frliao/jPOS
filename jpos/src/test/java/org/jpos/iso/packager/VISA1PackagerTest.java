@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,13 +18,15 @@
 
 package org.jpos.iso.packager;
 
+import static org.apache.commons.lang3.JavaVersion.JAVA_14;
+import static org.apache.commons.lang3.SystemUtils.isJavaVersionAtMost;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.ByteArrayInputStream;
-import java.util.Vector;
+import java.io.ByteArrayOutputStream;
 
 import org.jpos.iso.ISOBitMap;
 import org.jpos.iso.ISOComponent;
@@ -106,7 +108,11 @@ public class VISA1PackagerTest {
             new VISA1Packager(sequence, 100, "testVISA1PackagerBadResultCode", "testVISA1PackagerOkPattern").guessAutNumber(null);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"String.length()\" because \"s\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -116,8 +122,9 @@ public class VISA1PackagerTest {
         int[] sequence = new int[0];
         VISA1Packager vISA1Packager = new VISA1Packager(sequence, 100, "testVISA1PackagerBadResultCode",
                 "testVISA1PackagerOkPattern");
-        Vector v = new Vector(100, 1000);
-        int result = vISA1Packager.handleSpecialField35(new ISOMsg(100), v);
+        ByteArrayOutputStream bout = new ByteArrayOutputStream(100);
+
+        int result = vISA1Packager.handleSpecialField35(new ISOMsg(100), bout);
         assertEquals(0, result, "result");
     }
 
@@ -127,13 +134,18 @@ public class VISA1PackagerTest {
         int[] sequence = new int[0];
         VISA1Packager vISA1Packager = new VISA1Packager(sequence, 100, "testVISA1PackagerBadResultCode",
                 "testVISA1PackagerOkPattern");
-        Vector v = new Vector(100);
+        ByteArrayOutputStream bout = new ByteArrayOutputStream(100);
+
         try {
-            vISA1Packager.handleSpecialField35(null, v);
+            vISA1Packager.handleSpecialField35(null, bout);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
-            assertEquals(0, v.size(), "v.size()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"org.jpos.iso.ISOMsg.hasField(int)\" because \"m\" is null", ex.getMessage(), "ex.getMessage()");
+            }
+            assertEquals(0, bout.toByteArray().length);
         }
     }
 
@@ -229,7 +241,11 @@ public class VISA1PackagerTest {
             vISA1Packager.unpack(null, b);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"org.jpos.iso.ISOComponent.set(org.jpos.iso.ISOComponent)\" because \"m\" is null", ex.getMessage(), "ex.getMessage()");
+            }
             assertSame(vISA1Packager, vISA1Packager.filter, "vISA1Packager.filter");
         }
     }
@@ -245,7 +261,11 @@ public class VISA1PackagerTest {
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
             assertEquals(100, m.getMaxField(), "(ISOMsg) m.getMaxField()");
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"String.length()\" because \"prefix\" is null", ex.getMessage(), "ex.getMessage()");
+            }
             assertSame(vISA1Packager, vISA1Packager.filter, "vISA1Packager.filter");
         }
     }
@@ -259,7 +279,11 @@ public class VISA1PackagerTest {
             vISA1Packager.unpack(new ISOBitMap(100), (byte[]) null);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot read the array length because \"bytes\" is null", ex.getMessage(), "ex.getMessage()");
+            }
             assertSame(vISA1Packager, vISA1Packager.filter, "vISA1Packager.filter");
         }
     }

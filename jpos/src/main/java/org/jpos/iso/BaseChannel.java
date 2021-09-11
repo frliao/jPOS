@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -337,6 +337,8 @@ public abstract class BaseChannel extends Observable
                 int ii = nextHostPort++ % hosts.length;
                 evt.addMessage ("Try " + i + " " + hosts[ii]+":"+ports[ii]);
                 s = newSocket (hosts[ii], ports[ii]);
+                evt.addMessage ("  Connection established to "
+                                + s.getInetAddress().getHostAddress() + ":" + s.getPort());
                 break;
             } catch (IOException e) {
                 evt.addMessage ("  " + e.getMessage());

@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -36,7 +36,7 @@ import org.jpos.transaction.Context;
 @SuppressWarnings("unused")
 public class QueryHost implements TransactionParticipant, ISOResponseListener, Configurable {
     private static final long DEFAULT_TIMEOUT = 30000L;
-    private static final long DEFAULT_WAIT_TIMEOUT = 12000L;
+    private static final long DEFAULT_WAIT_TIMEOUT = 1000L;
 
     private long timeout;
     private long waitTimeout;
@@ -47,6 +47,7 @@ public class QueryHost implements TransactionParticipant, ISOResponseListener, C
     private Configuration cfg;
     private String request;
     private boolean ignoreUnreachable;
+    private boolean checkConnected= true;
 
     public QueryHost () {
         super();
@@ -121,10 +122,11 @@ public class QueryHost implements TransactionParticipant, ISOResponseListener, C
         destination = cfg.get ("destination", ContextConstants.DESTINATION.toString());
         continuations = cfg.getBoolean("continuations", true);
         ignoreUnreachable = cfg.getBoolean("ignore-host-unreachable", false);
+        checkConnected = cfg.getBoolean("check-connected", checkConnected);
     }
 
     protected boolean isConnected (MUX mux) {
-        if (mux.isConnected())
+        if (!checkConnected || mux.isConnected())
             return true;
         long timeout = System.currentTimeMillis() + waitTimeout;
         while (System.currentTimeMillis() < timeout) {

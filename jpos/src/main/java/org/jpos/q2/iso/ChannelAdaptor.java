@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -223,6 +223,7 @@ public class ChannelAdaptor
     {
         for (Object o : e.getChildren("filter")) {
             Element f = (Element) o;
+            if (!QFactory.isEnabled(f)) continue;
             String clazz = QFactory.getAttributeValue(f, "class");
             ISOFilter filter = (ISOFilter) fact.newInstance(clazz);
             fact.setLogger(filter, f);

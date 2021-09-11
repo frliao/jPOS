@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -156,7 +156,7 @@ public class Q2 implements FileFilter, Runnable {
         catch (Exception ignored) {
             // We won't stop anything just because we could
             // inot initialize slf4j.
-            ignored.printStackTrace();
+            // ignored.printStackTrace();
         }
         registerQ2();
     }
@@ -581,11 +581,7 @@ public class Q2 implements FileFilter, Runnable {
                     return false;
                 }
             }
-            String enabledAttribute = rootElement.getAttributeValue("enabled", "true");
-            if ("true".equalsIgnoreCase(enabledAttribute) ||
-                 "yes".equalsIgnoreCase(enabledAttribute) ||
-                enabledAttribute.contains(Environment.getEnvironment().getName()))
-            {
+            if (QFactory.isEnabled(rootElement)) {
                 if (evt != null)
                     evt.addMessage("deploy: " + f.getCanonicalPath());
                 Object obj = factory.instantiate (this, rootElement);
@@ -596,7 +592,7 @@ public class Q2 implements FileFilter, Runnable {
                 );
                 qentry.setInstance (instance);
             } else if (evt != null) {
-                evt.addMessage("deploy ignored (enabled='" + enabledAttribute + "'): " + f.getCanonicalPath());
+                evt.addMessage("deploy ignored (enabled='" + QFactory.getEnabledAttribute(rootElement) + "'): " + f.getCanonicalPath());
             }
         } 
         catch (InstanceAlreadyExistsException e) {
@@ -741,6 +737,7 @@ public class Q2 implements FileFilter, Runnable {
         options.addOption ("Ns", "no-scan", false, "Disables deploy directory scan");
         options.addOption ("Nd", "no-dynamic", false, "Disables dynamic classloader");
         options.addOption ("E", "environment", true, "Environment name");
+        options.addOption ("Ed", "envdir", true, "Environment file directory, defaults to cfg");
 
         try {
             CommandLine line = parser.parse (options, args);
@@ -753,6 +750,19 @@ public class Q2 implements FileFilter, Runnable {
                 helpFormatter.printHelp ("Q2", options);
                 System.exit (0);
             } 
+
+            // set up envdir and env before other parts of the system, so env is available
+            // force reload if any of the env options was changed
+            if (line.hasOption("Ed")) {
+                System.setProperty("jpos.envdir", line.getOptionValue("Ed"));
+            }
+            if (line.hasOption("E")) {
+                System.setProperty("jpos.env", line.getOptionValue("E"));
+            }
+            if (line.hasOption("Ed") || line.hasOption("E")) {
+                Environment.reload();
+            }
+
             if (line.hasOption ("c")) {
                 cli = new CLI(this, line.getOptionValue("c"), line.hasOption("i"));
             } else if (line.hasOption ("i")) 
@@ -775,10 +785,7 @@ public class Q2 implements FileFilter, Runnable {
                 pidFile = line.getOptionValue("p");
             if (line.hasOption("n"))
                 name = line.getOptionValue("n");
-            if (line.hasOption("E")) {
-                System.setProperty("jpos.env", line.getOptionValue("E"));
-                Environment.getEnvironment();
-            }
+
             disableDeployScan = line.hasOption("Ns");
             disableDynamicClassloader = line.hasOption("Nd");
             enableSsh = line.hasOption("s");
@@ -934,8 +941,12 @@ public class Q2 implements FileFilter, Runnable {
         while (rename.exists()){
             rename = new File(rename.getAbsolutePath()+"."+extension);
         }
-        getLog().warn("Tidying "+f.getAbsolutePath()+" out of the way, by adding ."+extension,"It will be called: "+rename.getAbsolutePath()+" see log above for detail of problem.");
-        f.renameTo(rename);
+        if (f.renameTo(rename)){
+            getLog().warn("Tidying "+f.getAbsolutePath()+" out of the way, by adding ."+extension,"It will be called: "+rename.getAbsolutePath()+" see log above for detail of problem.");
+        }
+        else {
+            getLog().warn("Error Tidying. Could not tidy  "+f.getAbsolutePath()+" out of the way, by adding ."+extension,"It could not be called: "+rename.getAbsolutePath()+" see log above for detail of problem.");
+        }
     }
 
     private void deleteFile (File f, String iuuid) {

@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,6 +21,10 @@ package org.jpos.security.jceadapter;
 import java.util.HashMap;
 import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
+
+import static org.apache.commons.lang3.JavaVersion.JAVA_13;
+import static org.apache.commons.lang3.JavaVersion.JAVA_14;
+import static org.apache.commons.lang3.SystemUtils.isJavaVersionAtMost;
 
 import javax.crypto.spec.SecretKeySpec;
 
@@ -271,7 +275,11 @@ public class JCESecurityModuleTest {
             jCESecurityModule.calculateKeyCheckValue(new SecretKeySpec("testString".getBytes(), "testJCESecurityModuleParam2"));
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"org.jpos.security.jceadapter.JCEHandler.encryptData(byte[], java.security.Key)\" because \"this.jceHandler\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -332,7 +340,11 @@ public class JCESecurityModuleTest {
             new JCESecurityModule(cfg, new Logger(), "testJCESecurityModuleRealm");
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"org.jpos.core.Configuration.get(String)\" because \"this.cfg\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -372,7 +384,11 @@ public class JCESecurityModuleTest {
             new JCESecurityModule().decryptPINImpl(null);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"org.jpos.security.EncryptedPIN.getPINBlock()\" because \"pinUnderLmk\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -392,7 +408,11 @@ public class JCESecurityModuleTest {
             new JCESecurityModule().encryptPINImpl(null, "testJCESecurityModuleAccountNumber");
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"String.length()\" because \"pin\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -470,7 +490,11 @@ public class JCESecurityModuleTest {
                     "testJCESecurityModuleKeyHexString1", "testJCESecurityModuleKeyCheckValueHexString1"));
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"org.jpos.security.SecureDESKey.getKeyBytes()\" because \"secureDESKey\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -481,7 +505,11 @@ public class JCESecurityModuleTest {
                     "testJCESecurityModuleKeyHexString1", "testJCESecurityModuleKeyCheckValueHexString1"), new SecureDESKey());
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"java.util.Map.containsKey(Object)\" because \"this.keyTypeToLMKIndex\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -491,7 +519,11 @@ public class JCESecurityModuleTest {
             new JCESecurityModule().exportPINImpl(null, new SecureDESKey(), (byte) 0);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"org.jpos.security.EncryptedPIN.getAccountNumber()\" because \"pinUnderLmk\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -522,7 +554,11 @@ public class JCESecurityModuleTest {
             new JCESecurityModule().generateKeyImpl((short) 100, "testJCESecurityModuleKeyType");
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"org.jpos.security.jceadapter.JCEHandler.generateDESKey(short)\" because \"this.jceHandler\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -535,7 +571,11 @@ public class JCESecurityModuleTest {
                     "testJCESecurityModuleKeyCheckValueHexString1"), true);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"java.util.Map.containsKey(Object)\" because \"this.keyTypeToLMKIndex\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -545,7 +585,11 @@ public class JCESecurityModuleTest {
             new JCESecurityModule().importKeyImpl((short) 100, "testJCESecurityModuleKeyType", ">".getBytes(), null, true);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"org.jpos.security.SecureDESKey.getKeyBytes()\" because \"secureDESKey\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -556,7 +600,11 @@ public class JCESecurityModuleTest {
                     "testJCESecurityModuleAccountNumber"), null);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"org.jpos.security.SecureDESKey.getKeyBytes()\" because \"secureDESKey\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -569,7 +617,11 @@ public class JCESecurityModuleTest {
                     "testString".getBytes()));
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"java.util.Map.containsKey(Object)\" because \"this.keyTypeToLMKIndex\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -579,7 +631,11 @@ public class JCESecurityModuleTest {
             new JCESecurityModule().importPINImpl(null, new SecureDESKey());
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"org.jpos.security.EncryptedPIN.getAccountNumber()\" because \"pinUnderKd1\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -641,7 +697,11 @@ public class JCESecurityModuleTest {
             jCESecurityModule.setConfiguration(cfg);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"org.jpos.core.Configuration.get(String)\" because \"this.cfg\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -652,7 +712,11 @@ public class JCESecurityModuleTest {
                     "testJCESecurityModuleAccountNumber"), null, new SecureDESKey(), (byte) 0);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"org.jpos.security.SecureDESKey.getKeyBytes()\" because \"secureDESKey\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -664,7 +728,11 @@ public class JCESecurityModuleTest {
                     "testJCESecurityModuleKeyType", keyBytes, "testString".getBytes()), new SecureDESKey(), (byte) 0);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"java.util.Map.containsKey(Object)\" because \"this.keyTypeToLMKIndex\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -676,7 +744,11 @@ public class JCESecurityModuleTest {
                     "testString".getBytes()), new SecureDESKey(), (byte) 0);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"java.util.Map.containsKey(Object)\" because \"this.keyTypeToLMKIndex\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -886,7 +958,11 @@ public class JCESecurityModuleTest {
                         ,serviceCode, atc, MKDMethod.OPTION_A);
             fail("Expected SMException to be thrown");
         } catch (SMException ex){
-            assertEquals("String index out of range: -4", ex.getNested().getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_13)) {
+                assertEquals("String index out of range: -4", ex.getNested().getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("begin 4, end 0, length 0", ex.getNested().getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -902,7 +978,11 @@ public class JCESecurityModuleTest {
                         ,serviceCode, atc, MKDMethod.OPTION_A);
             fail("Expected SMException to be thrown");
         } catch (SMException ex){
-            assertNull(ex.getNested().getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getNested().getMessage(), "ex.getNested().getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"String.length()\" because \"pan\" is null", ex.getNested().getMessage(), "ex.getNested().getMessage()");
+            }
         }
     }
 
@@ -997,7 +1077,11 @@ public class JCESecurityModuleTest {
             ,upn, data, MKDMethod.OPTION_A, cvc3);
             fail("Expected SMException to be thrown");
         } catch (SMException ex){
-            assertNull(ex.getNested().getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getNested().getMessage(), "ex.getNested().getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"String.length()\" because \"pan\" is null", ex.getNested().getMessage(), "ex.getNested().getMessage()");
+            }
         }
     }
 

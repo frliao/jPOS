@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -282,7 +282,17 @@ public class Context implements Externalizable, Loggeable, Pausable, Cloneable {
             p.println("");
             p.println(ISOUtil.hexdump(b));
             p.print(indent);
-        } else if (value instanceof LogEvent) {
+        }
+        else if (value instanceof short[]) {
+            p.print (Arrays.toString((short[]) value));
+        } else if (value instanceof int[]) {
+            p.print(Arrays.toString((int[]) value));
+        } else if (value instanceof long[]) {
+            p.print(Arrays.toString((long[]) value));
+        } else if (value instanceof Object[]) {
+            p.print (ISOUtil.normalize(Arrays.toString((Object[]) value), true));
+        }
+        else if (value instanceof LogEvent) {
             ((LogEvent) value).dump(p, indent);
             p.print(indent);
         } else if (value != null) {
@@ -354,8 +364,12 @@ public class Context implements Externalizable, Loggeable, Pausable, Cloneable {
         }
     }
     public PausedTransaction getPausedTransaction() {
-        return (PausedTransaction) get (PAUSED_TRANSACTION.toString());
+        return get (PAUSED_TRANSACTION.toString());
     }
+    public PausedTransaction getPausedTransaction(long timeout) {
+        return get (PAUSED_TRANSACTION.toString(), timeout);
+    }
+    
     public void setTimeout (long timeout) {
         this.timeout = timeout;
     }

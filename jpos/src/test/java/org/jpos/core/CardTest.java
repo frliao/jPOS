@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,6 +22,7 @@ import org.jpos.iso.ISOMsg;
 import org.junit.jupiter.api.Test;
 
 import java.util.Date;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -41,6 +42,14 @@ public class CardTest  {
     }
 
     @Test
+    public void testShortTrack2() throws Throwable {
+        Track2 t2 = Track2.builder()
+                .track("4111111111111111=").build();
+
+        assertEquals("4111111111111111", t2.getPan(), "pan");
+    }
+    
+    @Test
     public void testTrack1() throws Throwable {
         Track1 t1 = Track1.builder()
           .track("%B4111111111111111^FAT ALBERT                ^201112345671234567890?").build();
@@ -55,12 +64,12 @@ public class CardTest  {
     @Test
     public void testCard() throws Throwable {
         Track1 t1 = Track1.builder()
-          .track("%B4111111111111111^FAT ALBERT                ^201112345671234567890?").build();
+          .track("%B4111111111111111^FAT ALBERT                ^401112345671234567890?").build();
         Track2 t2 = Track2.builder()
-          .track("4111111111111111=201112345612345678901").build();
+          .track("4111111111111111=401112345612345678901").build();
         Card c = Card.builder()
           .pan("4111111111111111")
-          .exp("2011")
+          .exp("4011")
           .cvv("123")
           .cvv2("4567")
           .serviceCode("123")
@@ -95,10 +104,10 @@ public class CardTest  {
     @Test
     public void testISOMsg() throws Throwable {
         ISOMsg m = new ISOMsg("0800");
-        m.set(45, "%B4111111111111111^FAT ALBERT                ^201112345671234567890?");
-        m.set(35, "4111111111111111=201112345612345678901");
+        m.set(45, "%B4111111111111111^FAT ALBERT                ^401112345671234567890?");
+        m.set(35, "4111111111111111=401112345612345678901");
         m.set(2, "4111111111111111");
-        m.set(14, "2011");
+        m.set(14, "4011");
         Card c = Card.builder()
           .isomsg(m)
           .cvv2("123")
@@ -107,7 +116,7 @@ public class CardTest  {
 
         assertEquals(false, c.isExpired(new Date()), "not expired");
         assertEquals("4111111111111111", c.getPan(), "pan");
-        assertEquals("2011", c.getExp(), "exp");
+        assertEquals("4011", c.getExp(), "exp");
         assertEquals("123", c.getServiceCode(), "serviceCode");
         assertEquals("123", c.getTrack1().getServiceCode(), "t1.serviceCode");
         assertEquals("123", c.getTrack2().getServiceCode(), "t2.serviceCode");
@@ -116,5 +125,25 @@ public class CardTest  {
         assertEquals("4561", c.getTrack2().getCvv(), "t2.cvv");
         assertEquals("1234567890", c.getTrack1().getDiscretionaryData(), "discretionaryData");
         assertEquals("2345678901", c.getTrack2().getDiscretionaryData(), "discretionaryData");
+    }
+
+    @Test
+    public void testOverrideTrack1Pattern() throws Throwable {
+        Track1 t1 = Track1.builder()
+          .pattern(Pattern.compile("^[%]?[A-Z]+([0-9]{1,19})\\^([^\\^]{2,28})\\^([0-9]{4})([0-9]{3})([0-9]{4})?([0-9]{1,10})?"))
+          .track("B4111111111111111^ALPHAMERDADO PRUEBA         ^401110100026.000.003-6    000").build();
+        Track2 t2 = Track2.builder()
+          .track("4111111111111111=401110145612345678901").build();
+        Card c = Card.builder()
+          .pan("4111111111111111")
+          .exp("4011")
+          .cvv("123")
+          .cvv2("4567")
+          .serviceCode("101")
+          .track1(t1)
+          .track2(t2)
+          .build();
+
+        assertEquals(false, c.isExpired(new Date()), "not expired");
     }
 }

@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -157,7 +157,10 @@ public class StatefulFilter implements ISOFilter, Configurable{
         throws ISOFilter.VetoException 
     {
         int[] key = getKey();
-        StringBuilder b = new StringBuilder(getKeyPrefix());
+        String keyPrefix = getKeyPrefix();
+        if (keyPrefix == null)
+            throw new NullPointerException("key prefix can not be null");
+        StringBuilder b = new StringBuilder(keyPrefix);
         for (int aKey : key) {
             b.append("|");
             b.append(m.getString(aKey));

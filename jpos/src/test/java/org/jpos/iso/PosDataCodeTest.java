@@ -1,20 +1,40 @@
+/*
+ * jPOS Project [http://jpos.org]
+ * Copyright (C) 2000-2021 jPOS Software SRL
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package org.jpos.iso;
+
+import static org.jpos.iso.PosDataCode.POSEnvironment.M_COMMERCE;
+import static org.jpos.iso.PosDataCode.POSEnvironment.RECURRING;
+import static org.jpos.iso.PosDataCode.ReadingMethod.BARCODE;
+import static org.jpos.iso.PosDataCode.ReadingMethod.CONTACTLESS;
+import static org.jpos.iso.PosDataCode.ReadingMethod.PHYSICAL;
+import static org.jpos.iso.PosDataCode.SecurityCharacteristic.PKI_ENCRYPTION;
+import static org.jpos.iso.PosDataCode.SecurityCharacteristic.PRIVATE_ALG_ENCRYPTION;
+import static org.jpos.iso.PosDataCode.VerificationMethod.OFFLINE_PIN_IN_CLEAR;
+import static org.jpos.iso.PosDataCode.VerificationMethod.ONLINE_PIN;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.jpos.iso.PosDataCode.POSEnvironment;
 import org.jpos.iso.PosDataCode.ReadingMethod;
 import org.jpos.iso.PosDataCode.SecurityCharacteristic;
 import org.jpos.iso.PosDataCode.VerificationMethod;
 import org.junit.jupiter.api.Test;
-
-
-import static org.jpos.iso.PosDataCode.POSEnvironment.M_COMMERCE;
-import static org.jpos.iso.PosDataCode.POSEnvironment.RECURRING;
-import static org.jpos.iso.PosDataCode.ReadingMethod.*;
-import static org.jpos.iso.PosDataCode.SecurityCharacteristic.PKI_ENCRYPTION;
-import static org.jpos.iso.PosDataCode.SecurityCharacteristic.PRIVATE_ALG_ENCRYPTION;
-import static org.jpos.iso.PosDataCode.VerificationMethod.OFFLINE_PIN_IN_CLEAR;
-import static org.jpos.iso.PosDataCode.VerificationMethod.ONLINE_PIN;
-import static org.junit.jupiter.api.Assertions.*;
 
 public class PosDataCodeTest {
 
@@ -147,4 +167,94 @@ public class PosDataCodeTest {
                 "PRIVATE_ALG_ENCRYPTION should be present");
    }
 
+    @Test
+    public void checkIsEMV() {
+        pdc.setSecurityCharacteristics(PRIVATE_ALG_ENCRYPTION, PKI_ENCRYPTION);
+        pdc.unsetSecurityCharacteristics(PKI_ENCRYPTION);
+        pdc.setReadingMethods(ReadingMethod.ICC);
+        
+        assertTrue(pdc.isEMV());
+        assertFalse(pdc.isManualEntry());
+        assertFalse(pdc.isSwiped());        
+   }
+
+   @Test
+   public void checkIsManualEntry() {
+        pdc.setSecurityCharacteristics(PRIVATE_ALG_ENCRYPTION, PKI_ENCRYPTION);
+        pdc.unsetSecurityCharacteristics(PKI_ENCRYPTION);
+        pdc.setReadingMethods(ReadingMethod.PHYSICAL);
+        
+        assertFalse(pdc.isEMV());
+        assertTrue(pdc.isManualEntry());
+        assertFalse(pdc.isSwiped());        
+   }
+   
+   @Test
+   public void checkIsSwiped() {
+        pdc.setSecurityCharacteristics(PRIVATE_ALG_ENCRYPTION, PKI_ENCRYPTION);
+        pdc.unsetSecurityCharacteristics(PKI_ENCRYPTION);
+        pdc.setReadingMethods(ReadingMethod.MAGNETIC_STRIPE);
+        
+        assertFalse(pdc.isEMV());
+        assertFalse(pdc.isManualEntry());
+        assertTrue(pdc.isSwiped());        
+   }
+      
+   @Test
+   public void checkIsECommerce() {
+        pdc.setSecurityCharacteristics(PRIVATE_ALG_ENCRYPTION, PKI_ENCRYPTION);
+        pdc.unsetSecurityCharacteristics(PKI_ENCRYPTION);
+        pdc.setPOSEnvironments(POSEnvironment.E_COMMERCE);
+        pdc.setReadingMethods(ReadingMethod.PHYSICAL);
+        
+        assertFalse(pdc.isEMV());
+        assertTrue(pdc.isManualEntry());
+        assertTrue(pdc.isECommerce());
+        assertFalse(pdc.isSwiped());        
+   }   
+
+   @Test
+   public void checkIsRecurring() {
+        pdc.setSecurityCharacteristics(PRIVATE_ALG_ENCRYPTION, PKI_ENCRYPTION);
+        pdc.unsetSecurityCharacteristics(PKI_ENCRYPTION);
+        pdc.setPOSEnvironments(POSEnvironment.RECURRING);
+        pdc.setReadingMethods(ReadingMethod.PHYSICAL);
+        
+        assertFalse(pdc.isEMV());
+        assertTrue(pdc.isManualEntry());
+        assertFalse(pdc.isECommerce());
+        assertTrue(pdc.isRecurring());
+        assertFalse(pdc.isSwiped());        
+   }   
+
+   @Test
+   public void checkIsCardNotPresent() {
+
+        pdc.setSecurityCharacteristics(PRIVATE_ALG_ENCRYPTION, PKI_ENCRYPTION);
+        pdc.unsetSecurityCharacteristics(PKI_ENCRYPTION);
+        pdc.setReadingMethods(ReadingMethod.PHYSICAL);
+
+        pdc.setPOSEnvironments(POSEnvironment.RECURRING);        
+        assertTrue(pdc.isCardNotPresent(), "Should be true for recurring");
+        
+        pdc.unsetPOSEnvironments(POSEnvironment.RECURRING);
+        pdc.setPOSEnvironments(POSEnvironment.E_COMMERCE);
+        assertTrue(pdc.isCardNotPresent(), "Should be true for E-Commerce");
+
+        pdc.unsetPOSEnvironments(POSEnvironment.E_COMMERCE);
+        pdc.setPOSEnvironments(POSEnvironment.MOTO);
+        assertTrue(pdc.isCardNotPresent(), "Should be true for MO/TO");
+
+        pdc.unsetPOSEnvironments(POSEnvironment.MOTO);
+        pdc.unsetReadingMethods(ReadingMethod.PHYSICAL);
+        pdc.setPOSEnvironments(POSEnvironment.ATTENDED);
+        pdc.setReadingMethods(ReadingMethod.ICC);        
+        assertFalse(pdc.isCardNotPresent(), "Should be false for attended");
+
+        PosDataCode localPDC = new PosDataCode();
+        localPDC.setSecurityCharacteristics(PRIVATE_ALG_ENCRYPTION, PKI_ENCRYPTION);
+        localPDC.unsetSecurityCharacteristics(PKI_ENCRYPTION);
+        localPDC.setReadingMethods(ReadingMethod.MAGNETIC_STRIPE);
+        assertFalse(pdc.isCardNotPresent(), "Should be false for swiped");
+   } 
 }

@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,8 @@
 
 package org.jpos.space;
 
+import static org.apache.commons.lang3.JavaVersion.JAVA_14;
+import static org.apache.commons.lang3.SystemUtils.isJavaVersionAtMost;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -33,6 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.jpos.iso.ISOUtil;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -82,7 +85,11 @@ public class TSpaceTest {
             new TSpace.Expirable(new Object(), 100L).compareTo(null);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot read field \"expires\" because \"other\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -136,7 +143,11 @@ public class TSpaceTest {
             new TSpace.Expirable(null, 100L).toString();
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"Object.toString()\" because \"this.value\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -223,6 +234,7 @@ public class TSpaceTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
     public void testNotifyReaders() {
         final Space sp = new TSpace();
         final AtomicInteger ai = new AtomicInteger(10);

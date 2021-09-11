@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,44 +18,73 @@
 
 package org.jpos.util;
 
-import java.io.File;
+import java.io.IOException;
+import java.nio.file.FileStore;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.*;
+import java.util.List;
+import java.util.Set;
 
 public class LogRotationTestDirectory {
 
-    private File directory;
+    private final Path directory;
 
-    public LogRotationTestDirectory() {
+    private final FileStore filestore;
+
+    private AclFileAttributeView view;
+    private AclEntry denyEntry;
+
+    public LogRotationTestDirectory(Path tempDir) throws IOException {
+        directory = tempDir;
+        filestore = Files.getFileStore(directory);
+        if (!filestore.supportsFileAttributeView(PosixFileAttributeView.class) &&
+                filestore.supportsFileAttributeView(AclFileAttributeView.class)) {
+            view = Files.getFileAttributeView(directory, AclFileAttributeView.class);
+            denyEntry = AclEntry
+                    .newBuilder()
+                    .setType(AclEntryType.DENY)
+                    .setPrincipal(view.getOwner())
+                    .setPermissions(AclEntryPermission.ADD_FILE)
+                    .setFlags(AclEntryFlag.FILE_INHERIT,
+                            AclEntryFlag.DIRECTORY_INHERIT)
+                    .build();
+        }
     }
 
-    public synchronized File getDirectory() {
-        if (directory == null) {
-            directory = new File(System.getProperty("java.io.tmpdir"), "jposLogRotationTestDir");
-            directory.mkdirs();
-        }
+    public synchronized Path getDirectory() {
         return directory;
     }
 
-    public File getFile(String filename) {
-        return new File(getDirectory(), filename);
+    public Path getFile(String filename) {
+        return directory.resolve(filename);
     }
 
-    public void preventNewFileCreation() {
-        getDirectory().setExecutable(false);
+    public void preventNewFileCreation() throws IOException {
+        if (filestore.supportsFileAttributeView(PosixFileAttributeView.class)) {
+            Set<PosixFilePermission> perms = Files.readAttributes(directory, PosixFileAttributes.class).permissions();
+            perms.remove(PosixFilePermission.OWNER_EXECUTE);
+            Files.setPosixFilePermissions(directory, perms);
+        } else if (filestore.supportsFileAttributeView(AclFileAttributeView.class)) {
+            List<AclEntry> acl = view.getAcl();
+            acl.add(0, denyEntry);
+            view.setAcl(acl);
+        } else {
+            throw new IOException("Directory " + directory.toString() + " has unsupported FileStore type: " + filestore.type());
+        }
     }
 
-    public void allowNewFileCreation() {
-        getDirectory().setExecutable(true);
-    }
-
-    public synchronized void delete() {
-        if (directory != null) {
-            for (File log : directory.listFiles()) {
-                System.err.println("Deleting " + log);
-                log.deleteOnExit();
-                log.delete();
-            }
-
-            directory.delete();
+    public void allowNewFileCreation() throws IOException {
+        if (filestore.supportsFileAttributeView(PosixFileAttributeView.class)) {
+            Set<PosixFilePermission> perms = Files.readAttributes(directory, PosixFileAttributes.class).permissions();
+            perms.add(PosixFilePermission.OWNER_EXECUTE);
+            Files.setPosixFilePermissions(directory, perms);
+        } else if (filestore.supportsFileAttributeView(AclFileAttributeView.class)) {
+            List<AclEntry> acl = view.getAcl();
+            acl.remove(denyEntry);
+            view.setAcl(acl);
+        } else {
+            throw new IOException("Directory " + directory.toString() + " has unsupported FileStore type: " + filestore.type());
         }
     }
 }

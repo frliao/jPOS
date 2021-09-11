@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -36,9 +36,15 @@ public class SecureKeyBlockTest {
 
     private static final String NL = System.getProperty("line.separator");
 
-    private static final byte[] KEYBLOCK_MAC8 = ISOUtil.hex2byte("A1B2C3D4");
+    /**
+     * Test MAC with a length of 8 bytes.
+     */
+    private static final byte[] KEYBLOCK_MAC8 = ISOUtil.hex2byte("A1B2C3D4E5F60728");
 
-    private static final byte[] KEYBLOCK_MAC4 = ISOUtil.hex2byte("E1F2");
+    /**
+     * Test MAC with a length of 4 bytes.
+     */
+    private static final byte[] KEYBLOCK_MAC4 = ISOUtil.hex2byte("E1F22F1E");
 
     private static final byte[] KEYBLOCK_ENCKEY = ISOUtil.hex2byte("A9B8C7D6E5F49382");
 

@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,9 +25,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import static org.apache.commons.lang3.JavaVersion.JAVA_10;
+import static org.apache.commons.lang3.JavaVersion.JAVA_14;
 import static org.apache.commons.lang3.SystemUtils.isJavaVersionAtMost;
 
 import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
 
 public class JDBMSpaceTest {
 
@@ -156,7 +159,11 @@ public class JDBMSpaceTest {
             JDBMSpace.getLong(null, 100);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot load from byte/boolean array because \"b\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -174,7 +181,11 @@ public class JDBMSpaceTest {
             head.readExternal(null);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"java.io.ObjectInput.readLong()\" because \"in\" is null", ex.getMessage(), "ex.getMessage()");
+            }
             assertEquals(0L, head.count, "head.count");
             assertEquals(-1L, head.last, "head.last");
             assertEquals(-1L, head.first, "head.first");
@@ -193,7 +204,11 @@ public class JDBMSpaceTest {
             new JDBMSpace.Head().writeExternal(null);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot invoke \"java.io.ObjectOutput.writeLong(long)\" because \"out\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -243,7 +258,11 @@ public class JDBMSpaceTest {
             JDBMSpace.putLong(null, 100, 100L);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot store to byte/boolean array because \"b\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 
@@ -298,7 +317,11 @@ public class JDBMSpaceTest {
             ref.deserialize(null);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot load from byte/boolean array because \"b\" is null", ex.getMessage(), "ex.getMessage()");
+            }
             assertEquals(100L, ref.recid, "ref.recid");
             assertEquals(1000L, ref.expires, "ref.expires");
             assertEquals(-1L, ref.next, "ref.next");
@@ -307,7 +330,7 @@ public class JDBMSpaceTest {
 
     @Test
     public void testRefIsExpired() throws Throwable {
-        long expirytime = System.currentTimeMillis() + 365 * 24 * 60 * 60 * 1000;
+        long expirytime = Instant.now().toEpochMilli() + 365 * 24 * 60 * 60 * 1000;
         boolean result = new JDBMSpace.Ref(100L, expirytime).isExpired();
         assertFalse(result, "result");
     }
@@ -342,7 +365,11 @@ public class JDBMSpaceTest {
             new JDBMSpace.Ref().serialize(null);
             fail("Expected NullPointerException to be thrown");
         } catch (NullPointerException ex) {
-            assertNull(ex.getMessage(), "ex.getMessage()");
+            if (isJavaVersionAtMost(JAVA_14)) {
+                assertNull(ex.getMessage(), "ex.getMessage()");
+            } else {
+                assertEquals("Cannot read field \"recid\" because \"d\" is null", ex.getMessage(), "ex.getMessage()");
+            }
         }
     }
 

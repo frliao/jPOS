@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,17 +29,25 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Environment implements Loggeable {
+    private static final String DEFAULT_ENVDIR = "cfg";         // default dir for the env file (relative to cwd), overridable with sys prop "jpos.envdir"
+
+    private static final String CFG_PREFIX = "cfg";
     private static final String SYSTEM_PREFIX = "sys";
     private static final String ENVIRONMENT_PREFIX = "env";
-    private static Pattern valuePattern = Pattern.compile("^([\\w\\W]*)(\\$)([\\w\\W]*)?\\{([\\w\\W]+)\\}([\\w\\W]*)$");
+
+    private static Pattern valuePattern = Pattern.compile("^(.*)(\\$)([\\w]*)\\{([-\\w.]+)(:(.*))?\\}(.*)$");
+    // make groups easier to read :-)                       11112222233333333   44444444445566665    7777
+
     private static Pattern verbPattern = Pattern.compile("^\\$verb\\{([\\w\\W]+)\\}$");
     private static Environment INSTANCE;
+
     private String name;
+    private String envDir;
     private AtomicReference<Properties> propRef = new AtomicReference<>(new Properties());
     private static String SP_PREFIX = "system.property.";
     private static int SP_PREFIX_LENGTH = SP_PREFIX.length();
     private String errorString;
-
+    private ServiceLoader<EnvironmentProvider> serviceLoader;
 
     static {
         try {
@@ -53,11 +61,16 @@ public class Environment implements Loggeable {
     private Environment() throws IOException {
         name = System.getProperty ("jpos.env");
         name = name == null ? "default" : name;
+        envDir = System.getProperty("jpos.envdir", DEFAULT_ENVDIR);
         readConfig ();
+        serviceLoader = ServiceLoader.load(EnvironmentProvider.class);
     }
 
     public String getName() {
         return name;
+    }
+    public String getEnvDir() {
+        return envDir;
     }
 
     public static Environment reload() throws IOException {
@@ -87,7 +100,7 @@ public class Environment implements Loggeable {
      *
      * <ul>
      *     <li>Attempt to get it from an operating system environment variable called 'propname'</li>
-     *     <li>If not present, it will try to pick it from the a Java system.property</li>
+     *     <li>If not present, it will try to pick it from the Java system.property</li>
      *     <li>If not present either, it will try the target environment (either <code>.yml</code> or <code>.cfg</code></li>
      *     <li>Otherwise it returns null</li>
      * </ul>
@@ -103,17 +116,22 @@ public class Environment implements Loggeable {
         String r = s;
         if (s != null) {
             Matcher m = verbPattern.matcher(s);
-            if (m.matches()) {
-                return m.group(1);
+            if (m.matches()) {                      // matches $verb{...}
+                return m.group(1);                  // return internal value, verbatim
             }
+
             m = valuePattern.matcher(s);
-            if (!m.matches())
-                return s;
+            if (!m.matches())                       // doesn't match $xxx{...} at all
+                return s;                           // return the whole thing
+
             while (m != null && m.matches()) {
                 String gPrefix = m.group(3);
                 String gValue = m.group(4);
                 gPrefix = gPrefix != null ? gPrefix : "";
                 switch (gPrefix) {
+                    case CFG_PREFIX:
+                        r = propRef.get().getProperty(gValue, null);
+                        break;
                     case SYSTEM_PREFIX:
                         r = System.getProperty(gValue);
                         break;
@@ -123,22 +141,36 @@ public class Environment implements Loggeable {
                     default:
                         if (gPrefix.length() == 0) {
                             r = System.getenv(gValue); // ENV has priority
+                            r = r == null ? System.getenv(gValue.replace('.', '_').toUpperCase()) : r;
                             r = r == null ? System.getProperty(gValue) : r; // then System.property
                             r = r == null ? propRef.get().getProperty(gValue) : r; // then jPOS --environment
                         } else {
                             return s; // do nothing - unknown prefix
                         }
                 }
+
+                if (r == null) {
+                    String defValue = m.group(6);
+                    if (defValue != null)
+                        r = defValue;
+                }
+
                 if (r != null) {
                     if (m.group(1) != null) {
                         r = m.group(1) + r;
                     }
-                    if (m.group(5) != null)
-                        r = r + m.group(5);
+                    if (m.group(7) != null)
+                        r = r + m.group(7);
                     m = valuePattern.matcher(r);
                 }
                 else
                     m = null;
+            }
+        }
+        for (EnvironmentProvider p : serviceLoader) {
+            int l = p.prefix().length();
+            if (r != null && r.length() > l && r.startsWith(p.prefix())) {
+                r = p.get(r.substring(l));
             }
         }
         return r;
@@ -151,6 +183,8 @@ public class Environment implements Loggeable {
                 readCfg();
 
             extractSystemProperties();
+            propRef.get().put ("jpos.env", name);
+            propRef.get().put ("jpos.envdir", envDir);
         }
     }
 
@@ -164,7 +198,7 @@ public class Environment implements Loggeable {
     }
 
     private boolean readYAML () throws IOException {
-        File f = new File("cfg/" + name + ".yml");
+        File f = new File(envDir + "/" + name + ".yml");
         errorString = null;
         if (f.exists() && f.canRead()) {
             Properties properties = new Properties();
@@ -172,12 +206,10 @@ public class Environment implements Loggeable {
                 Yaml yaml = new Yaml();
                 Iterable<Object> document = yaml.loadAll(fis);
                 document.forEach(d -> {
-                    flat(properties, null, (Map<String, Object>) d);
+                    flat(properties, null, (Map<String, Object>) d, false);
                 });
                 propRef.set(properties);
                 return true;
-            } catch (IOException e) {
-                throw e;
             } catch (ScannerException e) {
                 errorString = "Environment (" + getName() + ") error " + e.getMessage();
             }
@@ -186,40 +218,38 @@ public class Environment implements Loggeable {
     }
 
     private boolean readCfg () throws IOException {
-        File f = new File("cfg/" + name + ".cfg");
+        File f = new File(envDir + "/" + name + ".cfg");
         if (f.exists() && f.canRead()) {
             Properties properties = new Properties();
             try (InputStream fis = new FileInputStream(f)) {
                 properties.load(new BufferedInputStream(fis));
                 propRef.set(properties);
                 return true;
-            } catch (IOException e) {
-                throw e;
             }
         }
         return false;
     }
 
     @SuppressWarnings("unchecked")
-    private void flat (Properties properties, String prefix, Map<String,Object> c) {
+    public static void flat (Properties properties, String prefix, Map<String,Object> c, boolean dereference) {
         for (Object o : c.entrySet()) {
             Map.Entry<String,Object> entry = (Map.Entry<String,Object>) o;
             String p = prefix == null ? entry.getKey() : (prefix + "." + entry.getKey());
             if (entry.getValue() instanceof Map) {
-                flat(properties, p, (Map) entry.getValue());
+                flat(properties, p, (Map) entry.getValue(), dereference);
             } else {
-                properties.put (p, "" + entry.getValue());
+                Object obj = entry.getValue();
+                properties.put (p, "" + (dereference && obj instanceof String ? Environment.get((String) obj) : entry.getValue()));
             }
         }
     }
 
     @Override
     public void dump(final PrintStream p, String indent) {
-        p.printf ("%s<environment name='%s'>%n", indent, name);
+        p.printf ("%s<environment name='%s' envdir='%s'>%n", indent, name, envDir);
         Properties properties = propRef.get();
         properties.stringPropertyNames().stream().
-          forEachOrdered(prop -> { p.printf ("%s  %s=%s%n", indent, prop, properties.getProperty(prop));
-          });
+          forEachOrdered(prop -> p.printf ("%s  %s=%s%n", indent, prop, properties.getProperty(prop)) );
         p.printf ("%s</environment>%n", indent);
     }
 
@@ -227,11 +257,27 @@ public class Environment implements Loggeable {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         if (name != null) {
-            sb.append(String.format("jpos.env=%s%n", name));
+            sb.append(String.format("[%s]%n", name));
             Properties properties = propRef.get();
             properties.stringPropertyNames().stream().
-              forEachOrdered(prop -> { sb.append(String.format ("  %s=%s%n", prop, properties.getProperty(prop)));
-              });
+              forEachOrdered(prop -> {
+                  String s = properties.getProperty(prop);
+                  String ds = Environment.get(String.format("${%s}", prop)); // de-referenced string
+                  boolean differ = !s.equals(ds);
+                  sb.append(String.format ("  %s=%s%s%n",
+                    prop,
+                    s,
+                    differ ? " (*)" : ""
+                  )
+              );
+            });
+            if (serviceLoader.iterator().hasNext()) {
+                sb.append ("  providers:");
+                sb.append (System.lineSeparator());
+                for (EnvironmentProvider provider : serviceLoader) {
+                    sb.append(String.format("    %s%n", provider.getClass().getCanonicalName()));
+                }
+            }
         }
         return sb.toString();
     }

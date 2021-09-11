@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -123,7 +123,6 @@ public class TransactionManager
 
     @Override
     public void startService () throws Exception {
-        NameRegistrar.register(getName(), this);
         recover();
         threads = Collections.synchronizedList(new ArrayList(maxSessions));
         if (tps != null)
@@ -139,10 +138,8 @@ public class TransactionManager
             loadMonitorExecutor = ConcurrentUtil.newScheduledThreadPoolExecutor();
             loadMonitorExecutor.scheduleAtFixedRate(
               new Thread(() -> {
-                  int outstandingTransactions = getOutstandingTransactions();
-                  int activeSessions = getActiveSessions();
-                  if (activeSessions < maxSessions && outstandingTransactions > threshold) {
-                      int count = Math.min(outstandingTransactions, maxSessions - activeSessions);
+                  int count = getSessionsToStandUp();
+                  if (count>0) {
                       for (int i=0; i<count; i++)
                           new Thread(this).start();
                       getLog().info("Created " + count + " additional sessions");
@@ -153,6 +150,7 @@ public class TransactionManager
         if (iisp != isp) {
             new Thread(new InputQueueMonitor()).start();
         }
+        NameRegistrar.register(getName(), this);
     }
 
     @Override
@@ -237,6 +235,9 @@ public class TransactionManager
             try {
                 if (hasStatusListeners)
                     notifyStatusListeners (session, TransactionStatusEvent.State.READY, id, "", null);
+                
+                if (isSessionToStandDown())
+                    break;
 
                 Object obj = iisp.in (queue, MAX_WAIT);
                 if (obj == Boolean.FALSE)
@@ -385,16 +386,15 @@ public class TransactionManager
                         evt.addMessage("WARNING: IN-TRANSIT TOO HIGH");
                     }
                     evt.addMessage (
-                        String.format (" in-transit=%d, head=%d, tail=%d, paused=%d, outstanding=%d, active-sessions=%d/%d, %s, elapsed=%dms",
-                            getInTransit(), head, tail, pausedCounter.get(), getOutstandingTransactions(),
-                            getActiveSessions(), maxSessions,
-                            tps.toString(), prof != null ? prof.getElapsedInMillis() : -1
+                        String.format (" %s, elapsed=%dms",
+                            tmInfo(),
+                            prof != null ? prof.getElapsedInMillis() : -1
                         )
                     );
                     if (prof != null)
                         evt.addMessage (prof);
                     try {
-                        Logger.log(new FrozenLogEvent(evt));
+                        Logger.log(freeze(context, evt, prof));
                     } catch (Throwable t) {
                         getLog().error(t);
                     }
@@ -417,7 +417,7 @@ public class TransactionManager
     }
 
     public long getInTransit () {
-        return activeTransactions.get();
+        return head - tail;
     }
 
     @Override
@@ -504,12 +504,7 @@ public class TransactionManager
 
     @Override
     public void dump (PrintStream ps, String indent) {
-        ps.printf ("%sin-transit=%d/%d, head=%d, tail=%d, paused=%d, outstanding=%d, active-sessions=%d/%d%s%n",
-          indent,
-          getActiveTransactions(), getInTransit(), head, tail, pausedCounter.get(), getOutstandingTransactions(),
-          getActiveSessions(), maxSessions,
-          (tps != null ? ", " + tps.toString() : "")
-        );
+        ps.printf ("%s%s%n", indent, tmInfo());
         if (metrics != null) {
             metrics.dump(ps, indent);
         }
@@ -688,7 +683,7 @@ public class TransactionManager
                         metrics.record(getName(p) + "-selector", c.lap());
                 }
                 if (evt != null) {
-                    evt.addMessage ("       selector: " + groupName);
+                    evt.addMessage ("       selector: '" + groupName +"'");
                 }
                 if (groupName != null) {
                     StringTokenizer st = new StringTokenizer (groupName, " ,");
@@ -696,6 +691,8 @@ public class TransactionManager
                     while (st.hasMoreTokens ()) {
                         String grp = st.nextToken();
                         addGroup (id, grp);
+                        if (evt != null && groups.get(grp) == null)
+                            evt.addMessage ("                 WARNING: group '" + grp + "' not configured");
                         participants.addAll (getParticipants (grp));
                     }
                     while (iter.hasNext())
@@ -737,8 +734,9 @@ public class TransactionManager
     }
     protected List<TransactionParticipant> getParticipants (String groupName) {
         List<TransactionParticipant> participants = groups.get (groupName);
-        if (participants == null)
+        if (participants == null) {
             participants = new ArrayList();
+        }
         return participants;
     }
     protected List<TransactionParticipant> getParticipants (long id) {
@@ -787,9 +785,13 @@ public class TransactionManager
     protected List<TransactionParticipant> initGroup (Element e) 
         throws ConfigurationException
     {
-        List group = new ArrayList ();
+        List<TransactionParticipant> group = new ArrayList<>();
         for (Element el : e.getChildren ("participant")) {
-            group.add(createParticipant(el));
+            if (QFactory.isEnabled(el)) {
+                group.add(createParticipant(el));
+            } else {
+                getLog().warn ("participant ignored (enabled='" + QFactory.getEnabledAttribute(el) + "'): " + el.getAttributeValue("class") + "/" + el.getAttributeValue("realm"));
+            }
         }
         return group;
     }
@@ -797,7 +799,7 @@ public class TransactionManager
         throws ConfigurationException
     {
         QFactory factory = getFactory();
-        TransactionParticipant participant = (TransactionParticipant) 
+        TransactionParticipant participant =
             factory.newInstance (QFactory.getAttributeValue (e, "class")
         );
         factory.setLogger (participant, e);
@@ -985,6 +987,20 @@ public class TransactionManager
         }
     }
 
+    /**
+     * This method gives the opportunity to decorate a LogEvent right before
+     * it gets logged. When overriding it, unless you know what you're doing,
+     * you should return a FrozenLogEvent in order to prevent concurrency issues.
+     *
+     * @param context current Context
+     * @param evt current LogEvent
+     * @param prof profiler (may be null)
+     * @return FrozenLogEvent
+     */
+    protected FrozenLogEvent freeze(Serializable context, LogEvent evt, Profiler prof) {
+        return new FrozenLogEvent(evt);
+    }
+
     public static class PausedMonitor extends TimerTask {
         Pausable context;
         public PausedMonitor (Pausable context) {
@@ -995,7 +1011,7 @@ public class TransactionManager
         public void run() {
             cancel();
             PausedTransaction paused = context.getPausedTransaction();
-            if (paused.getTransactionManager().abortOnPauseTimeout)
+            if (paused != null && paused.getTransactionManager().abortOnPauseTimeout)
                 paused.forceAbort();
             context.resume();
         }
@@ -1063,6 +1079,27 @@ public class TransactionManager
         return debug;
     }
 
+    /**
+     * This method returns the number of sessions that can be started at this point in time
+     * @return number of sessions
+     */
+    protected int getSessionsToStandUp() {
+        int outstandingTransactions = getOutstandingTransactions();
+        int activeSessions = getActiveSessions();
+        int count = 0;
+        if (activeSessions < maxSessions && outstandingTransactions > threshold) {
+            count = Math.min(outstandingTransactions, maxSessions - activeSessions);
+        }
+        return count;
+    }
+  
+    /** 
+     * This method returns true if current session should stop working on more messages
+     * @return
+     */
+    protected boolean isSessionToStandDown() {
+        return false;
+    }
 
     @Override
     public int getActiveSessions() {
@@ -1114,5 +1151,13 @@ public class TransactionManager
     private String getName(TransactionParticipant p) {
         String name;
         return ((name = names.get(p)) != null) ? name : p.getClass().getName();
+    }
+
+    private String tmInfo() {
+        return String.format ("in-transit=%d/%d, head=%d, tail=%d, paused=%d, outstanding=%d, active-sessions=%d/%d%s",
+          getActiveTransactions(), getInTransit(), head, tail, pausedCounter.get(), getOutstandingTransactions(),
+          getActiveSessions(), maxSessions,
+          (tps != null ? ", " + tps.toString() : "")
+        );
     }
 }

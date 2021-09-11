@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -69,17 +69,27 @@ public class MUXPool extends QBeanSupport implements MUX, MUXPoolMBean {
     public void stopService () {
         NameRegistrar.unregister ("mux."+getName ());
     }
+
     public ISOMsg request (ISOMsg m, long timeout) throws ISOException {
+        if (timeout == 0) {
+            // a zero timeout intent is to fire-and-forget,
+            // you should use 'send' instead of 'request'
+            try {
+                send(m);
+            } catch (IOException e) {
+                throw new ISOException(e.getMessage(), e);
+            }
+        }
         long maxWait = System.currentTimeMillis() + timeout;
         MUX mux = getMUX(m,maxWait);
-
         if (mux != null) {
-            timeout = maxWait - System.currentTimeMillis();
-            if (timeout >= 0)
-                return mux.request (m, timeout);
+            long remainingTimeout = maxWait - System.currentTimeMillis();
+            if (remainingTimeout >= 0)
+                return mux.request(m, remainingTimeout);
         }
         return null;
     }
+
     public void send (ISOMsg m) throws ISOException, IOException {
         long maxWait = 1000L; // reasonable default
         MUX mux = getMUX(m,maxWait);
@@ -129,13 +139,27 @@ public class MUXPool extends QBeanSupport implements MUX, MUXPoolMBean {
     public void request (ISOMsg m, long timeout, final ISOResponseListener r, final Object handBack) 
         throws ISOException 
     {
+        if (timeout == 0) {
+            // a zero timeout intent is to fire-and-forget,
+            // you should use 'send' instead of 'request'
+            try {
+                send(m);
+                new Thread() {
+                    public void run() {
+                        r.expired (handBack);
+                    }
+                }.start();
+            } catch (IOException e) {
+                throw new ISOException(e.getMessage(), e);
+            }
+        }
         long maxWait = System.currentTimeMillis() + timeout;
         MUX mux = getMUX(m,maxWait);
 
         if (mux != null) {
-            timeout = maxWait - System.currentTimeMillis();
-            if (timeout >= 0)
-                mux.request(m, timeout,r, handBack);
+            long remainingTimeout = maxWait - System.currentTimeMillis();
+            if (remainingTimeout >= 0)
+                mux.request(m, remainingTimeout, r, handBack);
             else {
                 new Thread() {
                     public void run() {

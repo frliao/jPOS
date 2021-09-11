@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,8 @@
 
 package org.jpos.space;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -287,28 +289,28 @@ public class TSpaceTestCase implements SpaceListener {
                 sp.out("KA", Boolean.TRUE);
             }
         }.start();
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         assertTrue(sp.existAny(new String[] { "KA", "KB" }, 2000L), "existAnyWithTimeout ([KA,KB], delay)");
-        long elapsed = System.currentTimeMillis() - now;
+        long elapsed = Duration.between(now, Instant.now()).toMillis();
         assertTrue(elapsed > 900L, "delay was > 1000");
     }
 
     @Test
     public void testNRD() {
-        long now  = System.currentTimeMillis();
+        Instant now = Instant.now();
         sp.out("NRD", "NRDTEST", 1000L);
         sp.nrd("NRD");
-        long elapsed = System.currentTimeMillis() - now;
+        long elapsed = Duration.between(now, Instant.now()).toMillis();
         assertTrue(elapsed >= 1000L, "Invalid elapsed time " + elapsed);
     }
     @Test
     public void testNRDWithDelay() {
-        long now  = System.currentTimeMillis();
+        Instant now = Instant.now();
         sp.out("NRD", "NRDTEST", 1000L);
         Object obj = sp.nrd("NRD", 500L);
         assertNotNull(obj, "Object should not be null");
         obj = sp.nrd("NRD", 5000L);
-        long elapsed = System.currentTimeMillis() - now;
+        long elapsed = Duration.between(now, Instant.now()).toMillis();
         assertTrue(elapsed >= 1000L && elapsed <= 2000L, "Invalid elapsed time " + elapsed);
         assertNull(obj, "Object should be null");
     }

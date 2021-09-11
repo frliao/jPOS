@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -289,7 +289,8 @@ public class SecureKeyBlock extends SecureKey {
 
         p.println(inner + "<data>" + ISOUtil.hexString(getKeyBytes()) + "</data>");
         p.println(inner + "<mac>" + ISOUtil.hexString(getKeyBlockMAC()) + "</mac>");
-        p.println(inner + "<check-value>" + ISOUtil.hexString(getKeyCheckValue()) + "</check-value>");
+        if (getKeyCheckValue() != null)
+            p.println(inner + "<check-value>" + ISOUtil.hexString(getKeyCheckValue()) + "</check-value>");
         p.println(indent + "</secure-key-block>");
     }
 

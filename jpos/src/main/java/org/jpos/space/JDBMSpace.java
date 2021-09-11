@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,6 +30,8 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 
 /**
@@ -189,7 +191,7 @@ public class JDBMSpace<K,V> extends TimerTask implements Space<K,V> {
                 long recid = recman.insert (value);
 
                 long expiration = timeout == -1 ? Long.MAX_VALUE :
-                        System.currentTimeMillis() + timeout;
+                        Instant.now().toEpochMilli() + timeout;
                 Ref dataRef = new Ref (recid, expiration);
                 long dataRefRecId = recman.insert (dataRef, refSerializer);
 
@@ -235,7 +237,7 @@ public class JDBMSpace<K,V> extends TimerTask implements Space<K,V> {
             synchronized (this) {
                 long recid = recman.insert (value);
                 long expiration = timeout == -1 ? Long.MAX_VALUE :
-                        System.currentTimeMillis() + timeout;
+                        Instant.now().toEpochMilli() + timeout;
                 Ref dataRef = new Ref (recid, expiration);
 
                 Head head = (Head) htree.get (key);
@@ -320,13 +322,13 @@ public class JDBMSpace<K,V> extends TimerTask implements Space<K,V> {
      */
     public synchronized V in (Object key, long timeout) {
         Object obj;
-        long now = System.currentTimeMillis();
-        long end = now + timeout;
+        Instant now = Instant.now();
+        long duration;
         while ((obj = inp (key)) == null &&
-                (now = System.currentTimeMillis()) < end)
+                (duration = Duration.between(now, Instant.now()).toMillis()) < timeout)
         {
             try {
-                this.wait (end - now);
+                this.wait (timeout - duration);
             } catch (InterruptedException ignored) { }
         }
         return (V) obj;
@@ -356,13 +358,13 @@ public class JDBMSpace<K,V> extends TimerTask implements Space<K,V> {
      */
     public synchronized V rd  (Object key, long timeout) {
         Object obj;
-        long now = System.currentTimeMillis();
-        long end = now + timeout;
+        Instant now = Instant.now();
+        long duration;
         while ((obj = rdp (key)) == null &&
-                (now = System.currentTimeMillis()) < end)
+                (duration = Duration.between(now, Instant.now()).toMillis()) < timeout)
         {
             try {
-                this.wait (end - now);
+                this.wait (timeout - duration);
             } catch (InterruptedException ignored) { }
         }
         return (V) obj;
@@ -376,13 +378,13 @@ public class JDBMSpace<K,V> extends TimerTask implements Space<K,V> {
     }
     public synchronized V nrd  (Object key, long timeout) {
         Object obj;
-        long now = System.currentTimeMillis();
-        long end = now + timeout;
+        Instant now = Instant.now();
+        long duration;
         while ((obj = rdp (key)) != null &&
-                (now = System.currentTimeMillis()) < end)
+                (duration = Duration.between(now, Instant.now()).toMillis()) < timeout)
         {
             try {
-                this.wait (Math.min(NRD_RESOLUTION, end - now));
+                this.wait (Math.min(NRD_RESOLUTION, timeout - duration));
             } catch (InterruptedException ignored) { }
         }
         return (V) obj;
@@ -408,14 +410,14 @@ public class JDBMSpace<K,V> extends TimerTask implements Space<K,V> {
         return false;
     }
     public boolean existAny (Object[] keys, long timeout) {
-        long now = System.currentTimeMillis();
-        long end = now + timeout;
-        while ((now = System.currentTimeMillis()) < end) {
+        Instant now = Instant.now();
+        long duration;
+        while ((duration = Duration.between(now, Instant.now()).toMillis()) < timeout) {
             if (existAny (keys))
                 return true;
             synchronized (this) {
                 try {
-                    wait (end - now);
+                    wait (timeout - duration);
                 } catch (InterruptedException ignored) { }
             }
         }
@@ -463,11 +465,14 @@ public class JDBMSpace<K,V> extends TimerTask implements Space<K,V> {
             }
         }
     }
+
+    @Override
     public void run () {
         try {
             gc();
-        } catch (Exception e) {
-            e.printStackTrace(); // this should never happen
+        } catch (Exception | SpaceError ex) {
+            // this happens when e.g. the jdbm file is corrupted
+            ex.printStackTrace();
         }
     }
     /**
@@ -660,7 +665,7 @@ public class JDBMSpace<K,V> extends TimerTask implements Space<K,V> {
         }
 
         public boolean isExpired () {
-            return expires < System.currentTimeMillis ();
+            return expires < Instant.now().toEpochMilli();
         }
         public String toString() {
             return getClass().getName() 

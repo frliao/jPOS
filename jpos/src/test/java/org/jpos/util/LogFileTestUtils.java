@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,16 +18,16 @@
 
 package org.jpos.util;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Scanner;
 import java.util.zip.GZIPInputStream;
 
 public class LogFileTestUtils {
-    public static String getStringFromCompressedFile(File file) throws IOException {
-        GZIPInputStream in = new GZIPInputStream(new FileInputStream(file));
+    public static String getStringFromCompressedFile(Path file) throws IOException {
+        GZIPInputStream in = new GZIPInputStream(Files.newInputStream(file));
         try {
             return getStringFromInputStream(in);
         } finally {
@@ -35,8 +35,8 @@ public class LogFileTestUtils {
         }
     }
 
-    public static String getStringFromFile(File file) throws IOException {
-        FileInputStream in = new FileInputStream(file);
+    public static String getStringFromFile(Path file) throws IOException {
+        InputStream in = Files.newInputStream(file);
         try {
             return getStringFromInputStream(in);
         } finally {

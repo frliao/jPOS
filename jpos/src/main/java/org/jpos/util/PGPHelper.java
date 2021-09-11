@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,6 +19,7 @@
 package org.jpos.util;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -32,8 +33,10 @@ import org.bouncycastle.openpgp.operator.KeyFingerPrintCalculator;
 import org.bouncycastle.openpgp.operator.PBESecretKeyDecryptor;
 import org.bouncycastle.openpgp.operator.bc.*;
 import org.bouncycastle.openpgp.operator.jcajce.JcaPGPContentVerifierBuilderProvider;
+import org.jpos.iso.ISOUtil;
 import org.jpos.q2.Q2;
 import org.jpos.q2.install.ModuleUtils;
+import org.jpos.security.SystemSeed;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -187,7 +190,7 @@ public class PGPHelper {
                     if (sig.verify()) {
                         rc &= 0x7FFFF;
                         ByteArrayInputStream bais = new ByteArrayInputStream(out.toByteArray());
-                        BufferedReader reader = new BufferedReader(new InputStreamReader(bais));
+                        BufferedReader reader = new BufferedReader(new InputStreamReader(bais, StandardCharsets.UTF_8));
                         String s;
                         Pattern p1 = Pattern.compile("\\s(valid through:)\\s(\\d\\d\\d\\d-\\d\\d-\\d\\d)?", Pattern.CASE_INSENSITIVE);
                         Pattern p2 = Pattern.compile("\\s(instances:)\\s([\\d]{0,4})?", Pattern.CASE_INSENSITIVE);
@@ -212,6 +215,8 @@ public class PGPHelper {
                 }
                 if (!Arrays.equals(Q2.PUBKEYHASH, mac.doFinal(pk.getEncoded())))
                     rc |= 0x20000;
+                if (ModuleUtils.getRKeys().contains(PGPHelper.getLicenseeHash()))
+                    rc |= 0x80000;
             }
         } catch (Exception ignored) {
             // NOPMD: signature isn't good
@@ -228,17 +233,20 @@ public class PGPHelper {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (InputStream is = getLicenseeStream()) {
             if (is != null) {
-                BufferedReader br = new BufferedReader(new InputStreamReader(is));
-                PrintStream p = new PrintStream(baos);
-                p.println();
-                p.println();
-                while (br.ready())
-                    p.println(br.readLine());
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                    PrintStream p = new PrintStream(baos, false, StandardCharsets.UTF_8.name());
+                    p.println();
+                    p.println();
+                    while(br.ready())
+                      p.println(br.readLine());
+                }
             }
         }
-        return baos.toString();
+        return baos.toString(StandardCharsets.UTF_8.name());
     }
-
+    public static String getLicenseeHash() throws IOException, NoSuchAlgorithmException {
+        return ISOUtil.hexString(hash(getLicensee()));
+    }
 
     /**
      * Simple PGP encryptor between byte[].
@@ -474,5 +482,10 @@ public class PGPHelper {
         ).build(pass);
 
         return pgpSecKey.extractPrivateKey(decryptor);
+    }
+
+    private static byte[] hash (String s) throws NoSuchAlgorithmException {
+        MessageDigest md = MessageDigest.getInstance("SHA-1");
+        return md.digest(s.getBytes(StandardCharsets.UTF_8));
     }
 }

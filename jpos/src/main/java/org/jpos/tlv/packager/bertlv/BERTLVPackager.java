@@ -1,6 +1,6 @@
 /*
  * jPOS Project [http://jpos.org]
- * Copyright (C) 2000-2019 jPOS Software SRL
+ * Copyright (C) 2000-2021 jPOS Software SRL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,8 +19,7 @@
 package org.jpos.tlv.packager.bertlv;
 
 
-import org.jpos.core.Configuration;
-import org.jpos.core.ConfigurationException;
+import org.jpos.emv.EMVStandardTagType;
 import org.jpos.emv.UnknownTagNumberException;
 import org.jpos.iso.AsciiInterpreter;
 import org.jpos.iso.BCDInterpreter;
@@ -40,10 +39,9 @@ import org.jpos.tlv.TLVDataFormat;
 import org.jpos.util.LogEvent;
 import org.jpos.util.Logger;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 
@@ -56,7 +54,7 @@ import java.util.Map;
 public abstract class BERTLVPackager extends GenericPackager {
 
     private static final int MAX_LENGTH_BYTES = 5;
-    private static final int MAX_TAG_BYTES = 2;
+    private static final int MAX_TAG_BYTES = 3;
 
     private static final LiteralInterpreter literalInterpreter = LiteralInterpreter.INSTANCE;
     private static final AsciiInterpreter asciiInterpreter = AsciiInterpreter.INSTANCE;
@@ -86,6 +84,7 @@ public abstract class BERTLVPackager extends GenericPackager {
     /**
      * Pack the sub-field into a byte array
      */
+    @Override
     public byte[] pack(ISOComponent m) throws ISOException {
         return pack(m, false, getFirstField(), m.getMaxField());
     }
@@ -93,11 +92,9 @@ public abstract class BERTLVPackager extends GenericPackager {
     public byte[] pack(ISOComponent m, boolean nested, int startIdx, int endIdx)
             throws ISOException {
         LogEvent evt = new LogEvent(this, "pack");
-        try {
+        try (ByteArrayOutputStream bout = new ByteArrayOutputStream(100)) {
             ISOComponent c;
-            List<byte[]> l = new ArrayList<byte[]>();
             Map fields = m.getChildren();
-            int len = 0;
             for (int i = startIdx; i <= endIdx; i++) {
                 c = (ISOComponent) fields.get(i);
                 if (c != null) {
@@ -123,8 +120,7 @@ public abstract class BERTLVPackager extends GenericPackager {
                                                 " should be configured for the same");
                             }
                         }
-                        len += b.length;
-                        l.add(b);
+                        bout.write(b);
                     } catch (Exception e) {
                         evt.addMessage("error packing sub-field " + i);
                         evt.addMessage(c);
@@ -133,12 +129,8 @@ public abstract class BERTLVPackager extends GenericPackager {
                     }
                 }
             }
-            int k = 0;
-            byte[] d = new byte[len];
-            for (byte[] b : l) {
-                System.arraycopy(b, 0, d, k, b.length);
-                k += b.length;
-            }
+
+            byte[] d = bout.toByteArray();
             if (logger != null) // save a few CPU cycle if no logger available
                 evt.addMessage(ISOUtil.hexString(d));
             return d;
@@ -265,8 +257,6 @@ public abstract class BERTLVPackager extends GenericPackager {
                             valueInterpreter.uninterpret(value, 0, uninterpretLength);
 
                     tlvSubFieldData = unpackValue(tag, rawValueBytes, subFieldNumber, length);
-
-
                     consumed = consumed + length;
                     ISOTaggedField tlv = new ISOTaggedField(tag, tlvSubFieldData);
                     m.set(tlv);
@@ -348,16 +338,24 @@ public abstract class BERTLVPackager extends GenericPackager {
         if (c.getComposite() == null) {
             if (c.getValue() instanceof String) {
                 tagValue = (String) c.getValue();
+                EMVStandardTagType tagType;
+                int length;
+                if (EMVStandardTagType.isProprietaryTag(Integer.parseInt(tagNameHex, 16))) {
+                    length = tagValue.length();
+                } else {
+                    tagType = EMVStandardTagType.forHexCode(tagNameHex);
+                    length = Math.max(tagValue.length(), tagType.getDataLength().getMinLength());
+                }
                 switch (dataFormat) {
                     case COMPRESSED_NUMERIC:
-                        packedValue = new byte[bcdInterpreterRightPaddedF.getPackedLength(tagValue.length())];
+                        packedValue = new byte[bcdInterpreterRightPaddedF.getPackedLength(length)];
                         bcdInterpreterRightPaddedF.interpret(tagValue, packedValue, 0);
                         break;
                     case PACKED_NUMERIC:
                     case PACKED_NUMERIC_DATE_YYMMDD:
                     case PACKED_NUMERIC_TIME_HHMMSS:
-                        packedValue = new byte[bcdInterpreterLeftPaddedZero.getPackedLength(tagValue.length())];
-                        bcdInterpreterLeftPaddedZero.interpret(tagValue, packedValue, 0);
+                        packedValue = new byte[bcdInterpreterLeftPaddedZero.getPackedLength(length)];
+                        bcdInterpreterLeftPaddedZero.interpret(ISOUtil.zeropad(tagValue, length), packedValue, 0);
                         break;
                     case ASCII_NUMERIC:
                     case ASCII_ALPHA:
@@ -404,20 +402,17 @@ public abstract class BERTLVPackager extends GenericPackager {
             case COMPRESSED_NUMERIC:
                 uninterpretLength = getUninterpretLength(dataLength, bcdInterpreterRightPaddedF);
                 unpackedValue = bcdInterpreterRightPaddedF.uninterpret(tlvData, 0, uninterpretLength);
-                if (unpackedValue.length() > 1 && unpackedValue.charAt(unpackedValue.length() - 1) == 'F') {
-                    unpackedValue = unpackedValue.substring(0, unpackedValue.length() - 1);
-                }
-                value = new ISOField(subFieldNumber, unpackedValue);
+                value = new ISOField(subFieldNumber, ISOUtil.unPadRight(unpackedValue, 'F'));
                 break;
             case PACKED_NUMERIC:
+                uninterpretLength = getUninterpretLength(dataLength, bcdInterpreterLeftPaddedZero);
+                unpackedValue = bcdInterpreterLeftPaddedZero.uninterpret(tlvData, 0, uninterpretLength);
+                value = new ISOField(subFieldNumber, ISOUtil.unPadLeft(unpackedValue, '0'));
+                break;
             case PACKED_NUMERIC_DATE_YYMMDD:
             case PACKED_NUMERIC_TIME_HHMMSS:
                 uninterpretLength = getUninterpretLength(dataLength, bcdInterpreterLeftPaddedZero);
                 unpackedValue = bcdInterpreterLeftPaddedZero.uninterpret(tlvData, 0, uninterpretLength);
-
-                if (unpackedValue.length() > 1 && unpackedValue.charAt(0) == '0') {
-                    unpackedValue = unpackedValue.substring(1);
-                }
                 value = new ISOField(subFieldNumber, unpackedValue);
                 break;
             case ASCII_NUMERIC:
@@ -450,13 +445,19 @@ public abstract class BERTLVPackager extends GenericPackager {
     }
 
     private int getUninterpretLength(int length, BinaryInterpreter interpreter) {
-        int lengthAdjusted = length + length % 2;
-        return length * (lengthAdjusted / interpreter.getPackedLength(lengthAdjusted));
+        if (length > 0) {
+            int lengthAdjusted = length + length % 2;
+            return length * (lengthAdjusted / interpreter.getPackedLength(lengthAdjusted));
+        }
+        return 0;
     }
 
     private int getUninterpretLength(int length, Interpreter interpreter) {
-        int lengthAdjusted = length + length % 2;
-        return length * (lengthAdjusted / interpreter.getPackedLength(lengthAdjusted));
+        if (length > 0) {
+            int lengthAdjusted = length + length % 2;
+            return length * (lengthAdjusted / interpreter.getPackedLength(lengthAdjusted));
+        }
+        return 0;
     }
 
     private class UnpackResult {
